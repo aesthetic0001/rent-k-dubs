@@ -1,10 +1,11 @@
+import type { TransactionSql } from "postgres";
 import { safetyCaveats } from "@rentkdubs/shared/engine/safety";
 import { AreaChoroplethSchema, type AreaChoropleth } from "@rentkdubs/shared/schemas";
 import { z } from "zod";
 import { ApiError, jsonRoute } from "../api/json-route";
 import { getClient } from "../db";
 import type { AreaKind } from "./area-facts";
-import { crimeTableSource, safetyForListing, type CrimeTable } from "./safety";
+import { safetyForListing, type CrimeTable } from "./safety";
 
 // GET /api/areas?kind=&indicator= (SPEC 13, P3.10 choropleth). Owner: D. One indicator for every
 // neighbourhood, with outlines simplified to ~10 m. `crime` is the police-reported major-crime
@@ -46,7 +47,7 @@ export function crimeChoropleth(outlines: OutlineRow[], table: CrimeTable): Area
 }
 
 export async function loadChoropleth(
-  sql: NonNullable<ReturnType<typeof getClient>>,
+  sql: NonNullable<ReturnType<typeof getClient>> | TransactionSql,
   kind: AreaKind,
   indicator: string,
   crimeTable: () => Promise<CrimeTable | null>,
@@ -55,16 +56,19 @@ export async function loadChoropleth(
     SELECT id, name,
            ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(geometry, ${SIMPLIFY_DEGREES}::float8)), 5)::json
              AS geometry
-    FROM ${sql(TABLES[kind])} ORDER BY id`;
+    FROM ${sql(TABLES[kind])}
+    WHERE source_id IN ('waterloo-district-plans', 'waterloo-city-boundary')
+    ORDER BY id`;
   if (indicator === "crime") {
     const table = await crimeTable();
     return table ? crimeChoropleth(outlines, table) : null;
   }
   const values = await sql<ValueRow[]>`
-    SELECT DISTINCT ON (area_id) area_id, value, unit, period, source_id
-    FROM area_indicators
-    WHERE area_kind = ${kind} AND indicator_id = ${indicator}
-    ORDER BY area_id, period DESC`;
+    SELECT DISTINCT ON (i.area_id) i.area_id, i.value, i.unit, i.period, i.source_id
+    FROM area_indicators i JOIN ${sql(TABLES[kind])} n ON n.id = i.area_id
+    WHERE i.area_kind = ${kind} AND i.indicator_id = ${indicator}
+      AND n.source_id IN ('waterloo-district-plans', 'waterloo-city-boundary')
+    ORDER BY i.area_id, i.period DESC`;
   if (values.length === 0) return null;
   const byArea = new Map(values.map((row) => [row.area_id, row]));
   return AreaChoroplethSchema.parse({
@@ -95,7 +99,7 @@ const CACHE_MS = 60 * 60 * 1000;
 
 export function createChoroplethRoute(
   client: typeof getClient = getClient,
-  crimeTable: () => Promise<CrimeTable | null> = crimeTableSource(client),
+  crimeTable: () => Promise<CrimeTable | null> = async () => null,
 ) {
   const cache = new Map<string, { at: number; value: AreaChoropleth }>();
   return jsonRoute({ name: "areas.choropleth" }, async (_input, request) => {

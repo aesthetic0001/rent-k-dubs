@@ -17,6 +17,7 @@ import { PriceBadge } from "@/components/results/price-badge";
 import { priceSummary } from "@/components/results/card-data";
 import {
   AreaCard,
+  MonthlyCost,
   RentCheck,
   SafetySection,
   SourceButton,
@@ -28,6 +29,7 @@ import { modeIcons } from "@/components/mode-icons";
 import { modeTimeText, RangeBar, ScoreGauge } from "./detail-charts";
 import { scoreBreakdown, travelTable } from "./detail-data";
 import { NearbySection, NearbyTile } from "./nearby-section";
+import { PoliceActivity } from "./police-activity";
 import { useListingDetail } from "./use-listing-detail";
 import { useNearby, type NearbyState } from "./use-nearby";
 import { addressLine } from "@/components/listing/address-line";
@@ -103,8 +105,10 @@ export function ListingDetail({ id }: { id: string }) {
         <div className="flex min-w-0 flex-col gap-5 lg:col-span-8">
           <RentCheck result={data} now={now} />
           <AreaCard extras={extras} />
+          <PoliceActivity key={data.listing.id} {...data.listing.location} />
         </div>
         <div className="flex min-w-0 flex-col gap-5 lg:col-span-4">
+          <MonthlyCost listing={data.listing} />
           <TheHome result={data} />
           <NearbySection state={nearby} />
           {intent?.safety.enabled && <SafetySection result={data} />}
