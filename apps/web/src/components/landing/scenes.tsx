@@ -1,32 +1,54 @@
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { CSSProperties } from "react";
 import { t, type MessageKey } from "@/lib/format/messages";
-import { FarSkyline, IonTrain, MidBlocks, NearStreet } from "./skyline";
+import { LakeScene } from "./lake";
+import { IonTrain } from "./skyline";
 
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
 
-/** Night over the city: the wordmark sits between the downtown towers and the street, which rises over it. */
-export function HeroScene() {
+/** Counts shown in the hero's band; null when the database can't be read. */
+export type HeroStats = { listings: number; neighbourhoods: number; sources: number } | null;
+
+const compact = new Intl.NumberFormat("en-CA", { notation: "compact", maximumFractionDigits: 1 });
+
+/** Morning mist on Silver Lake: the headline on the open water, the pine and the bank beside it. */
+export function HeroScene({ stats }: { stats: HeroStats }) {
   return (
     <section data-scene data-still="0" className="scene scene-hero" aria-labelledby="hero-title">
       <div className="scene-stage">
         <div className="hero-sky" />
-        <FarSkyline className="layer layer-far" />
-        <div className="hero-mark">
-          <p className="hero-tagline">{t("landing.tagline")}</p>
-          <h1 id="hero-title" className="wordmark" aria-label={t("common.appName")}>
-            <span className="wordmark-top">{t("landing.logoTop")}</span>
-            <span className="wordmark-big">{t("landing.logoBottom")}</span>
+        <LakeScene className="hero-art" />
+        <div className="hero-grain" aria-hidden />
+        <div className="hero-copy">
+          <h1 id="hero-title" className="hero-title text-balance">
+            {t("landing.title")}
           </h1>
+          <p className="hero-lede text-pretty">{t("landing.hero.lede")}</p>
+          <a href="#start" className="hero-cta">
+            {t("landing.hero.cta")}
+            <ArrowRight aria-hidden className="size-5" />
+          </a>
         </div>
-        <MidBlocks className="layer layer-mid" />
-        <div className="layer-near">
-          <NearStreet className="layer-near-street" />
-          <div className="layer-near-fill" />
+        <div className="hero-band">
+          {stats && (
+            <dl className="hero-stats">
+              {(["listings", "neighbourhoods", "sources"] as const).map((key) => (
+                <div key={key} className="hero-stat">
+                  <dt>{t(`landing.hero.stats.${key}` as MessageKey)}</dt>
+                  <dd>{compact.format(stats[key]).replace("K", "k")}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <div className="hero-note">
+            <p className="text-pretty">{t("landing.paste.body")}</p>
+            <Link href="/paste" className="hero-note-link">
+              {t("landing.paste.title")}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
+          </div>
         </div>
-        <p className="scroll-cue" aria-hidden>
-          {t("landing.scrollCue")}
-          <span />
-        </p>
       </div>
     </section>
   );
@@ -91,14 +113,64 @@ export function SayScene() {
   );
 }
 
-/** An ION train drives across and pulls the page from night into morning. */
+const r = (key: string) => t(`landing.result.${key}` as MessageKey);
+
+/**
+ * An ION train drives across and pulls the page from the deep water into the morning, which holds
+ * what comes back for the request typed in the scene before: one result with its price check and
+ * its trip to campus. The figures illustrate that request; they are not a live listing.
+ */
 export function RideScene() {
   return (
-    <section data-scene className="scene scene-ride" aria-hidden>
+    <section data-scene className="scene scene-ride" aria-labelledby="result-title">
       <div className="scene-stage">
         <div className="ride-morning" />
-        <div className="wire" />
+        <div className="wire" aria-hidden />
         <IonTrain className="train" />
+        <div className="result">
+          <h2 id="result-title" className="result-title">
+            {r("title")}
+          </h2>
+          <article className="result-card" aria-label={r("label")}>
+            <svg className="result-map" viewBox="0 0 320 132" role="img" aria-label={r("map")}>
+              <path
+                className="result-streets"
+                d="M0 28H320M0 74H320M0 112H320M46 0V132M128 0V132M214 0V132M282 0V132"
+              />
+              <path className="result-route" d="M70 104H128V52H214V30H258" />
+              <circle className="result-home" cx="70" cy="104" r="7" />
+              <circle className="result-campus" cx="258" cy="30" r="9" />
+              <text className="result-campus-label" x="258" y="16" textAnchor="middle">
+                UW
+              </text>
+            </svg>
+            <div className="result-body">
+              <div className="result-head">
+                <div className="min-w-0">
+                  <h3 className="result-name">{r("name")}</h3>
+                  <p className="result-area">{r("area")}</p>
+                </div>
+                <p className="result-rent">
+                  {r("rent")}
+                  <span>{r("perMonth")}</span>
+                </p>
+              </div>
+              <div className="result-price">
+                <p>{r("price")}</p>
+                <div className="result-range" aria-hidden>
+                  <span className="result-range-you" />
+                  <span className="result-range-typical" />
+                </div>
+                <p className="result-range-labels" aria-hidden>
+                  <span>{r("low")}</span>
+                  <span>{r("typical")}</span>
+                </p>
+              </div>
+              <p className="result-trip">{r("trip")}</p>
+              <p className="result-facts">{r("facts")}</p>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
   );

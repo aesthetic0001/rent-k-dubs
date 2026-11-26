@@ -108,8 +108,57 @@ function chipStyle(chip: Chip): string {
   return "border-border bg-secondary text-secondary-foreground";
 }
 
+/**
+ * The current search in a few words ("Up to $2,500, 2 bedrooms"), in the row beside Filters and
+ * Sort. It opens the editable chips (`FilterChips`) below the row.
+ */
+export function FilterSummary({
+  intent,
+  open,
+  onToggle,
+  controls,
+}: {
+  intent: SearchIntent;
+  open: boolean;
+  onToggle: () => void;
+  /** The id of the chips panel it opens. */
+  controls: string;
+}) {
+  const chips = buildChips(intent);
+  if (!chips.length) return null;
+  const preview = chips.slice(0, SUMMARY_CHIPS).map((chip) => chip.label);
+  const more = chips.length - preview.length;
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controls}
+      onClick={onToggle}
+      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 order-last flex min-w-0 basis-full items-center gap-1 rounded-md text-left text-sm transition-colors outline-none focus-visible:ring-3 sm:order-none sm:flex-1 sm:basis-auto"
+    >
+      <span className="sr-only">{t("filters.summaryLabel")}: </span>
+      <span className="truncate">
+        {preview.join(", ")}
+        {more > 0 && ` ${t("filters.summaryMore", { count: more })}`}
+      </span>
+      <ChevronDown
+        aria-hidden
+        className={`size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+      />
+    </button>
+  );
+}
+
 /** Editable chips for the current search. Every edit re-runs search without calling the parser. */
-export function FilterChips({ intent }: { intent: SearchIntent }) {
+export function FilterChips({
+  intent,
+  id,
+  open,
+}: {
+  intent: SearchIntent;
+  id: string;
+  open: boolean;
+}) {
   const updateIntent = useAppStore((s) => s.updateIntent);
   const chips = buildChips(intent);
   if (!chips.length) return null;
@@ -119,32 +168,16 @@ export function FilterChips({ intent }: { intent: SearchIntent }) {
     void runSearch();
   };
 
-  const preview = chips.slice(0, SUMMARY_CHIPS).map((chip) => chip.label);
-  const more = chips.length - preview.length;
-
-  // Collapsed by default: a one-line summary; the editable chips open on tap.
+  // Rendered while closed too, so the summary's aria-controls always points at something.
   return (
-    <details
-      aria-labelledby="filters-label"
-      className="group bg-card flex flex-col rounded-2xl border px-4 py-3"
+    <div
+      id={id}
+      role="region"
+      aria-label={t("filters.summaryLabel")}
+      hidden={!open}
+      className="accent-trip bg-card flex flex-col rounded-2xl border px-4 py-3"
     >
-      <summary className="focus-visible:ring-ring/50 -mx-1 flex cursor-pointer list-none items-center gap-2 rounded-lg px-1 py-0.5 text-sm outline-none focus-visible:ring-3 [&::-webkit-details-marker]:hidden">
-        <span id="filters-label" className="shrink-0 font-semibold">
-          {t("filters.summaryLabel")}
-        </span>
-        <span className="bg-primary text-primary-foreground figures grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-xs font-semibold">
-          {chips.length}
-        </span>
-        <span className="text-muted-foreground min-w-0 flex-1 truncate group-open:invisible">
-          {preview.join(", ")}
-          {more > 0 && ` ${t("filters.summaryMore", { count: more })}`}
-        </span>
-        <ChevronDown
-          aria-hidden
-          className="text-muted-foreground size-4 shrink-0 transition-transform group-open:rotate-180"
-        />
-      </summary>
-      <ul className="mt-3 flex flex-wrap gap-2">
+      <ul className="flex flex-wrap gap-2">
         {chips.map((chip) => (
           <li key={chip.key} className="max-w-full">
             <ChipButton chip={chip} intent={intent} onEdit={edit} />
@@ -167,7 +200,7 @@ export function FilterChips({ intent }: { intent: SearchIntent }) {
         </span>
         <span className="ml-auto">{t("filters.legendTap")}</span>
       </div>
-    </details>
+    </div>
   );
 }
 

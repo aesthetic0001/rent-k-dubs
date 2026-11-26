@@ -16,7 +16,8 @@ export function SiteHeader() {
       >
         {t("layout.skipToContent")}
       </a>
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4">
+      {/* Full width over a full-width page (the search's list and map), centred everywhere else. */}
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 [body:has(.wide-page)_&]:max-w-none lg:[body:has(.wide-page)_&]:px-6">
         <Link
           href="/"
           aria-label={t("layout.homeLink")}

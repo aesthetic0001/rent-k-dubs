@@ -28,6 +28,8 @@ import { useAppStore } from "@/lib/store/store";
 const s = (key: string, params?: Record<string, string | number>) =>
   t(`shortlist.${key}` as MessageKey, params);
 const decimal = new Intl.NumberFormat("en-CA", { maximumFractionDigits: 1 });
+/** How long "Undo" stays after removing a listing. */
+const UNDO_MS = 8_000;
 
 function facts(listing: SavedListing): string[] {
   const parts: string[] = [];
@@ -43,8 +45,13 @@ function facts(listing: SavedListing): string[] {
   return parts;
 }
 
-function ShortlistItem({ entry }: { entry: ShortlistEntry }) {
-  const remove = useAppStore((state) => state.removeFromShortlist);
+function ShortlistItem({
+  entry,
+  onRemove,
+}: {
+  entry: ShortlistEntry;
+  onRemove: (entry: ShortlistEntry) => void;
+}) {
   const setSavedImage = useAppStore((state) => state.setSavedImage);
   // Listings saved before the shortlist kept photos: look the photo up once and keep it.
   const missingImage = entry.kind === "listing" && entry.saved.imageUrl === undefined;
@@ -108,7 +115,7 @@ function ShortlistItem({ entry }: { entry: ShortlistEntry }) {
       <button
         type="button"
         aria-label={t("results.shortlistRemove", { title: listing.title })}
-        onClick={() => remove(entry.id)}
+        onClick={() => onRemove(entry)}
         className="hover:bg-accent focus-visible:ring-ring/50 text-muted-foreground relative z-10 -mt-1 -mr-1 grid size-9 shrink-0 place-items-center rounded-md outline-none focus-visible:ring-3"
       >
         <X aria-hidden className="size-5" />
@@ -158,6 +165,22 @@ export function ShortlistView() {
   const shortlist = useAppStore((state) => state.shortlist);
   const [cleared, setCleared] = useState(false);
   const newestFirst = shortlist.toReversed();
+  const removeFromShortlist = useAppStore((state) => state.removeFromShortlist);
+  const restore = useAppStore((state) => state.restoreShortlistEntry);
+  // The last removal, kept for a few seconds so it can be undone.
+  const [removed, setRemoved] = useState<{ entry: ShortlistEntry; index: number } | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const timer = window.setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [removed]);
+  const remove = (entry: ShortlistEntry) => {
+    setRemoved({ entry, index: shortlist.findIndex((item) => item.id === entry.id) });
+    removeFromShortlist(entry.id);
+  };
+  const removedTitle = removed
+    ? (removed.entry.kind === "listing" ? removed.entry.saved : removed.entry.listing).title
+    : "";
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
@@ -184,12 +207,32 @@ export function ShortlistView() {
           <ol className="flex flex-col gap-3">
             {newestFirst.map((entry) => (
               <li key={entry.id}>
-                <ShortlistItem entry={entry} />
+                <ShortlistItem entry={entry} onRemove={remove} />
               </li>
             ))}
           </ol>
         </>
       )}
+
+      <p role="status" aria-live="polite" className="flex items-center gap-3 text-sm empty:hidden">
+        {removed && (
+          <>
+            <span className="text-muted-foreground min-w-0 truncate">
+              {s("removed", { title: removedTitle })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                restore(removed.entry, removed.index);
+                setRemoved(null);
+              }}
+            >
+              {s("undo")}
+            </Button>
+          </>
+        )}
+      </p>
 
       <div className="flex flex-col gap-2 border-t pt-6">
         {loaded && <ClearMyData onCleared={() => setCleared(true)} />}

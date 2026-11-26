@@ -8,16 +8,23 @@ import type { SearchResultItem } from "@/lib/store/types";
 import { addressLine } from "@/components/listing/address-line";
 import { t } from "@/lib/format/messages";
 import { formatCad } from "@/lib/format/number";
+import { formatDistance } from "@/components/results/travel-facts-data";
 import { BAND_COLORS, scoreBand } from "./map-data";
 
 /** The selected listing on the map and in the list: its ring, route line and card accent. */
-export const ACTIVE_COLOR = "#3ddc97";
+export const ACTIVE_COLOR = "#f0866b";
+
+const compactRent = new Intl.NumberFormat("en-CA", {
+  style: "currency",
+  currency: "CAD",
+  currencyDisplay: "narrowSymbol",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 /** Short rent for a pin's chip: "$1.5k" from $1,000 up, so chips stay narrow. */
 export function chipRent(cad: number): string {
-  if (cad < 1000) return `$${Math.round(cad)}`;
-  const k = Math.round(cad / 100) / 10;
-  return `$${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)}k`;
+  return compactRent.format(cad).replace("K", "k");
 }
 
 function rooms(listing: SearchResultItem["listing"]): string | null {
@@ -142,22 +149,38 @@ export function listingCard(
   return card;
 }
 
-/** The basemap's own colours, swapped for flat greys so the pins and the route stand out. */
-const GREY = {
-  background: "#29292b",
-  water: "#3a3b3f",
-  green: "#2e302f",
-  building: "#333336",
-  land: "#2c2c2e",
-  road: "#454549",
-  majorRoad: "#56565b",
-  rail: "#3d3d41",
-  text: "#8d8d93",
-  halo: "#29292b",
+/**
+ * The basemap's own colours, swapped for the landing's lake palette (dusk teals in dark, morning
+ * mist in light) so the pins and the route stand out.
+ */
+const DUSK = {
+  background: "#1e3538",
+  water: "#2b4c54",
+  green: "#223d37",
+  building: "#29433f",
+  land: "#203a3c",
+  road: "#345457",
+  majorRoad: "#456769",
+  rail: "#2e4b4e",
+  text: "#8fa9a6",
+  halo: "#1e3538",
+};
+const MIST: typeof DUSK = {
+  background: "#e4eded",
+  water: "#b4ccd1",
+  green: "#d2e2d9",
+  building: "#d6e1e0",
+  land: "#e1eaea",
+  road: "#f6f9f8",
+  majorRoad: "#ffffff",
+  rail: "#c3d3d2",
+  text: "#5f7c79",
+  halo: "#eef4f1",
 };
 
-/** Recolour the dark basemap to greys. Paint a layer doesn't have is skipped. */
-export function greyBasemap(map: MapLibreMap): void {
+/** Recolour the basemap to the lake palette. Paint a layer doesn't have is skipped. */
+export function greyBasemap(map: MapLibreMap, theme: "light" | "dark" = "dark"): void {
+  const GREY = theme === "dark" ? DUSK : MIST;
   const set = (id: string, property: PaintProperty, value: string | undefined) => {
     try {
       map.setPaintProperty(id, property, value);
@@ -199,12 +222,6 @@ export function greyBasemap(map: MapLibreMap): void {
   }
 }
 
-/** "350 m" or "1.2 km". */
-export function shortDistance(metres: number): string {
-  if (metres < 1000) return `${Math.round(metres / 10) * 10} m`;
-  return `${(Math.round(metres / 100) / 10).toFixed(1)} km`;
-}
-
 /** The nearest grocery store (or park, pharmacy…) behind a hovered trip line: a dot and its name. */
 export function amenityPinElement(name: string, distanceM: number): HTMLDivElement {
   const pin = document.createElement("div");
@@ -213,13 +230,13 @@ export function amenityPinElement(name: string, distanceM: number): HTMLDivEleme
   dot.className = "amenity-pin-dot";
   const label = document.createElement("span");
   label.className = "amenity-pin-label";
-  label.textContent = `${name} · ${shortDistance(distanceM)}`;
+  label.textContent = `${name} · ${formatDistance(distanceM)}`;
   pin.append(dot, label);
   return pin;
 }
 
 /**
- * A numbered place near the selected listing ("01"), mint when it's the one picked. A button:
+ * A numbered place near the selected listing ("01"), coral when it's the one picked. A button:
  * clicking it picks that place, the same as its card in the nearby panel.
  */
 export function nearbyPinElement(

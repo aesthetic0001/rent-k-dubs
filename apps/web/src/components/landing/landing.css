@@ -3,43 +3,107 @@
  * motion from it. Scenes are tall sections with a sticky full-screen stage.
  */
 .landing {
-  --l-far: #2b2560;
-  --l-mid: #1d1846;
-  --l-near: #120f2e;
-  --l-glow: #f6a75a;
+  /* Morning mist on the lake; the scenes below sit in its deep water. */
+  --l-far: #3d6a6c;
+  --l-mid: #24494d;
+  --l-near: #163236;
+  --l-glow: #f0866b;
   --ion-blue: #1f6cc6;
-  --mist: #e4ecf6;
-  --ink: #120f2e;
-  --ink-soft: #4a4670;
-  --display: var(--font-display), var(--font-sans);
+  --mist: #e3ecee;
+  --ink: #1f3b3a;
+  --ink-soft: #46625f;
+  --l-action: #2c4b49;
+  --l-action-ink: #f4f8f6;
+  --display: var(--font-public-sans), var(--font-sans);
+  /* The painting's palette. */
+  --lk-sky-1: #a9c2cc;
+  --lk-sky-2: #d6e2e4;
+  --lk-sky-3: #eef2ee;
+  --lk-far: #bfd1d4;
+  --lk-mist: #eef2ee;
+  --lk-water-1: #b3cbd0;
+  --lk-water-2: #7fa6ae;
+  --lk-water-3: #163236;
+  --lk-glint: #f4f8f6;
+  --lk-leaf-1: #234e3f;
+  --lk-leaf-2: #3b6f55;
+  --lk-leaf-3: #7aa274;
+  --lk-trunk: #6a3826;
+  --lk-rock-1: #b8683c;
+  --lk-rock-2: #7c3f26;
+  --lk-rock-3: #d99a64;
+  --lk-red: #d9443a;
+  --lk-goose: #6f5b4a;
+  --lk-goose-belly: #cbbfae;
 }
 
-/* Dark mode: the night carries on past the ride; the search section uses the dark page tokens. */
+/* Dark mode: the same lake at dusk. */
 .dark .landing {
-  --mist: var(--background);
-  --ink: var(--foreground);
-  --ink-soft: var(--muted-foreground);
+  --mist: #142a2d;
+  --ink: #e4efec;
+  --ink-soft: #a9c2bd;
+  --l-action: #cfe5dd;
+  --l-action-ink: #12292b;
+  --lk-sky-1: #0f1d24;
+  --lk-sky-2: #213941;
+  --lk-sky-3: #35505a;
+  --lk-far: #33505a;
+  --lk-mist: #35505a;
+  --lk-water-1: #2f4a53;
+  --lk-water-2: #1f3a40;
+  --lk-water-3: #163236;
+  --lk-glint: #a9c2c8;
+  --lk-leaf-1: #12291f;
+  --lk-leaf-2: #1d3d2e;
+  --lk-leaf-3: #3a5f47;
+  --lk-trunk: #3a2018;
+  --lk-rock-1: #6e3c24;
+  --lk-rock-2: #46241a;
+  --lk-rock-3: #85532f;
+  --lk-red: #b23a32;
+  --lk-goose: #3e342c;
+  --lk-goose-belly: #7d7569;
 }
 
-/* On the landing the header floats over the night sky and scrolls away with it. */
+/* On the landing the header floats over the mist, its links in a frosted pill, and scrolls away. */
 body:has(.landing) > header {
   position: absolute;
   inset-inline: 0;
   background: transparent;
   border: 0;
   backdrop-filter: none;
-  color: #fff4e2;
+  color: var(--ink);
 }
-body:has(.landing) > header nav a {
-  color: rgb(255 244 226 / 0.8);
+body:has(.landing) > header > div {
+  height: 4.5rem;
+}
+body:has(.landing) > header nav {
+  padding: 0.3rem;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.32);
+  backdrop-filter: blur(10px);
+}
+.dark body:has(.landing) > header nav {
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.07);
+}
+body:has(.landing) > header nav a,
+body:has(.landing) > header nav button {
+  border-radius: 999px;
+  color: var(--ink-soft);
 }
 body:has(.landing) > header nav a:hover,
 body:has(.landing) > header button:hover {
-  color: #fff4e2;
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.4);
+}
+.dark body:has(.landing) > header nav a:hover,
+.dark body:has(.landing) > header button:hover {
   background: rgb(255 255 255 / 0.1);
 }
 body:has(.landing) > header a > span[aria-hidden] {
-  color: var(--l-glow);
+  color: var(--ink);
 }
 body:has(.landing) > footer {
   background: var(--mist);
@@ -57,145 +121,171 @@ body:has(.landing) > footer {
 }
 
 /* ---------- Hero ---------- */
+/* Scene lengths: about three screens of scrolling from the hero to the search box. */
 .scene-hero {
-  height: 170svh;
+  height: 120svh;
+  color: var(--ink);
 }
 .hero-sky {
   position: absolute;
   inset: 0;
-  background: linear-gradient(#0d0a24 0%, #231c55 42%, #5b3a78 66%, #c9715a 86%, #f2a25c 100%);
+  background: linear-gradient(var(--lk-sky-1) 0%, var(--lk-sky-2) 48%, var(--lk-sky-3) 74%);
 }
-.hero-sky::after {
-  content: "";
+.hero-art {
   position: absolute;
-  inset: 0 0 45% 0;
-  background-image:
-    radial-gradient(1.5px 1.5px at 8% 22%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 17% 64%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 27% 12%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 36% 44%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 47% 8%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 58% 30%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 66% 70%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 74% 16%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 83% 48%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 92% 26%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 96% 78%, #fff 50%, transparent 51%);
-  opacity: 0.7;
-  transform: translate3d(0, calc(var(--p, 0) * -6svh), 0);
-}
-.layer {
-  position: absolute;
-  left: 0;
-  bottom: 0;
+  inset: auto 0 0 0;
   width: 100%;
-  will-change: transform;
-}
-.layer-far {
-  height: 64svh;
-  transform: translate3d(0, calc(var(--p, 0) * -14svh), 0);
-}
-.layer-mid {
-  height: 36svh;
-  transform: translate3d(0, calc(var(--p, 0) * -48svh), 0);
-}
-.layer-near {
-  position: absolute;
-  left: 0;
-  top: 76svh;
-  width: 100%;
-  will-change: transform;
-  transform: translate3d(0, calc(var(--p, 0) * -100svh), 0);
-}
-.layer-near-street {
-  display: block;
-  width: 100%;
-  height: 24svh;
-}
-.layer-near-fill {
-  height: 110svh;
-  margin-top: -1px;
-  background: var(--l-near);
-}
-
-.hero-mark {
-  position: absolute;
-  inset-inline: 0;
-  top: 22svh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  will-change: transform, opacity;
-  transform: translate3d(0, calc(var(--p, 0) * -28svh), 0) scale(calc(1 + var(--p, 0) * 0.15));
-  opacity: calc(1 - var(--p, 0) * 1.4);
-}
-.hero-tagline {
-  margin-bottom: 1rem;
-  padding-inline: 16px;
-  color: #e9ddfb;
-  font-size: clamp(1.05rem, 1.7vw, 1.4rem);
-  font-weight: 500;
-}
-.wordmark {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #fff4e2;
-  font-family: var(--display);
-  line-height: 0.8;
-  text-transform: uppercase;
-}
-.wordmark-top {
-  font-size: clamp(2.25rem, 6.5vw, 6rem);
-  margin-bottom: 0.18em;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-}
-.wordmark-big {
-  font-size: min(40vw, 44svh);
-  font-weight: 900;
-  letter-spacing: -0.01em;
-  text-shadow: 0 0 80px rgb(242 162 92 / 0.35);
+  height: 58svh;
 }
 @media (min-width: 768px) {
-  .hero-mark {
-    top: 12svh;
+  .hero-art {
+    height: 100svh;
   }
+}
+/* Paper grain over the whole painting. */
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark .hero-grain {
+  mix-blend-mode: overlay;
 }
 
-.scroll-cue {
+.hero-copy {
   position: absolute;
-  bottom: 3svh;
-  left: 50%;
+  top: 6.5rem;
+  left: max(16px, calc((100vw - 72rem) / 2 + 1rem));
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: min(calc(100vw - 32px), 40rem);
+  will-change: transform, opacity;
+  transform: translate3d(0, calc(var(--p, 0) * -16svh), 0);
+  opacity: calc(1 - var(--p, 0) * 1.6);
+}
+@media (min-width: 768px) {
+  .hero-copy {
+    top: 24svh;
+  }
+}
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 5.2vw, 4.6rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+.hero-lede {
+  max-width: 36rem;
+  color: var(--ink-soft);
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+  line-height: 1.45;
+}
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 1rem 1.4rem 1rem 1.6rem;
+  border-radius: 999px;
+  background: var(--l-action);
+  color: var(--l-action-ink);
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.hero-cta:hover {
+  background: color-mix(in oklch, var(--l-action) 88%, var(--ink-soft));
+}
+.hero-cta:focus-visible {
+  outline: 3px solid var(--l-action);
+  outline-offset: 3px;
+}
+.hero-cta svg {
+  transition: transform 0.2s;
+}
+.hero-cta:hover svg {
+  transform: translateX(3px);
+}
+
+/* The frosted band across the water: live counts, and the other way in. */
+.hero-band {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.25rem max(16px, calc((100vw - 72rem) / 2 + 1rem));
+  border-top: 1px solid rgb(255 255 255 / 0.25);
+  background: rgb(214 230 233 / 0.42);
+  color: var(--ink);
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+.dark .hero-band {
+  border-top-color: rgb(255 255 255 / 0.08);
+  background: rgb(20 42 45 / 0.5);
+}
+@media (min-width: 768px) {
+  .hero-band {
+    padding-block: 2rem;
+  }
+}
+.hero-stats {
+  display: flex;
+  flex: 1;
+}
+.hero-stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.25rem;
+  padding-inline: 0 clamp(1rem, 3vw, 2.5rem);
+}
+.hero-stat + .hero-stat {
+  padding-left: clamp(1rem, 3vw, 2.5rem);
+  border-left: 1px solid color-mix(in oklch, var(--ink) 35%, transparent);
+}
+.hero-stat dd {
+  font-size: clamp(1.75rem, 4.2vw, 3.5rem);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.hero-stat dt {
+  color: var(--ink-soft);
+  font-size: clamp(0.75rem, 1.1vw, 0.95rem);
+}
+.hero-note {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: 26rem;
+  color: var(--ink-soft);
+}
+@media (min-width: 1024px) {
+  .hero-note {
+    display: flex;
+  }
+}
+.hero-note-link {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: #fff4e2;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  transform: translateX(-50%);
-  opacity: calc(1 - var(--p, 0) * 8);
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-thickness: 1px;
 }
-.scroll-cue span {
-  width: 1px;
-  height: 40px;
-  background: linear-gradient(#fff4e2, transparent);
-  transform-origin: top;
-  animation: cue 1.8s ease-in-out infinite;
-}
-@keyframes cue {
-  0% {
-    transform: scaleY(0);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-  100% {
-    transform: scaleY(1);
-    opacity: 0;
-  }
+.hero-note-link:hover {
+  text-decoration-thickness: 2px;
 }
 
 /* ---------- Say it ---------- */
@@ -203,8 +293,8 @@ body:has(.landing) > footer {
   --type: clamp(0, calc((var(--p, 0) - 0.04) / 0.38), 1);
   --hl: clamp(0, calc((var(--p, 0) - 0.44) / 0.1), 1);
   --c: clamp(0, calc((var(--p, 0) - 0.56) / 0.26), 1);
-  height: 210svh;
-  color: #f4eeff;
+  height: 160svh;
+  color: #eef4f1;
 }
 .say-title {
   position: absolute;
@@ -212,8 +302,9 @@ body:has(.landing) > footer {
   inset-inline: 16px;
   text-align: center;
   font-family: var(--display);
-  font-size: clamp(2rem, 5.5vw, 4.5rem);
-  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   line-height: 1;
   opacity: calc(1 - var(--c) * 1.5);
   transform: translate3d(0, calc(var(--c) * -10svh), 0);
@@ -224,13 +315,14 @@ body:has(.landing) > footer {
   left: 50%;
   width: min(92vw, 17ch);
   font-family: var(--display);
-  font-size: clamp(2.4rem, 6.4vw, 5.5rem);
-  font-weight: 600;
-  line-height: 1.02;
+  font-size: clamp(2.2rem, 5.6vw, 4.8rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
   text-align: center;
   will-change: transform, opacity;
   transform: translate3d(-50%, calc(-50% - var(--c) * 30svh), 0) scale(calc(1 - var(--c) * 0.3));
-  opacity: calc(1 - var(--c) * 0.92);
+  opacity: clamp(0, calc(1 - var(--c) * 2), 1);
 }
 .ch {
   opacity: clamp(0, calc((var(--type) - var(--t)) * 40), 1);
@@ -276,7 +368,7 @@ body:has(.landing) > footer {
   bottom: 9svh;
   left: 50%;
   width: min(calc(100vw - 32px), 44ch);
-  color: #cfc4ec;
+  color: #b9d0cb;
   font-size: clamp(1rem, 1.4vw, 1.2rem);
   text-align: center;
   transform: translateX(-50%);
@@ -286,8 +378,10 @@ body:has(.landing) > footer {
 /* ---------- ION train into morning ---------- */
 .scene-ride {
   --car: 210vw;
-  --w: clamp(0, calc(var(--p, 0) / 0.85), 1);
-  height: 150svh;
+  --w: clamp(0, calc(var(--p, 0) / 0.7), 1);
+  /* The result card settles once the morning has filled the screen. */
+  --r: clamp(0, calc((var(--p, 0) - 0.62) / 0.3), 1);
+  height: 125svh;
 }
 @media (min-width: 768px) {
   .scene-ride {
@@ -305,7 +399,7 @@ body:has(.landing) > footer {
   inset-inline: 0;
   top: calc(50svh - var(--car) * 0.0713);
   height: 2px;
-  background: #4a4380;
+  background: #4f7a7a;
   opacity: calc(1 - var(--w));
 }
 .train {
@@ -316,6 +410,167 @@ body:has(.landing) > footer {
   width: var(--car);
   will-change: transform;
   transform: translate3d(calc(100vw - var(--w) * (100vw + var(--car))), -50%, 0);
+}
+
+/* The result that comes back: one listing, its price check and its trip to campus. */
+.result {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 5rem 16px 2rem;
+  color: var(--ink);
+  opacity: var(--r);
+  transform: translate3d(0, calc((1 - var(--r)) * 4svh), 0);
+}
+.result-title {
+  font-family: var(--display);
+  font-size: clamp(2rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-align: center;
+}
+.result-card {
+  width: min(100%, 26rem);
+  overflow: hidden;
+  border: 1px solid rgb(15 35 37 / 0.12);
+  border-radius: 1.25rem;
+  background: #ffffff;
+  color: #1f3b3a;
+  box-shadow: 0 18px 40px -12px rgb(15 35 37 / 0.35);
+}
+.dark .result-card {
+  border-color: rgb(255 255 255 / 0.12);
+  background: #1d3c40;
+  color: #f4eeff;
+}
+.result-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #e7eeee;
+}
+.dark .result-map {
+  background: #163236;
+}
+.result-streets {
+  fill: none;
+  stroke: #d3dfdf;
+  stroke-width: 6;
+}
+.dark .result-streets {
+  stroke: #2a4a4f;
+}
+.result-route {
+  fill: none;
+  stroke: var(--l-glow);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 320;
+  stroke-dashoffset: calc((1 - var(--r)) * 320);
+}
+.result-home {
+  fill: var(--l-glow);
+  stroke: #1f3b3a;
+  stroke-width: 3;
+}
+.result-campus {
+  fill: var(--ion-blue);
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+.result-campus-label {
+  fill: currentColor;
+  font-size: 12px;
+  font-weight: 700;
+}
+.result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.125rem 1.25rem 1.25rem;
+}
+.result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.result-name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.result-area,
+.result-facts,
+.result-range-labels {
+  color: #56706d;
+  font-size: 0.8125rem;
+}
+.dark .result-area,
+.dark .result-facts,
+.dark .result-range-labels {
+  color: #a9c2bd;
+}
+.result-rent {
+  flex: none;
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.result-rent span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.result-price p:first-child {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.result-range {
+  position: relative;
+  height: 6px;
+  margin-block: 0.5rem 0.375rem;
+  border-radius: 3px;
+  background: rgb(15 35 37 / 0.1);
+}
+.dark .result-range {
+  background: rgb(255 255 255 / 0.14);
+}
+.result-range-you,
+.result-range-typical {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.result-range-you {
+  left: 22%;
+  background: var(--l-glow);
+  box-shadow: 0 0 0 2px #1f3b3a;
+}
+.result-range-typical {
+  left: 64%;
+  background: currentColor;
+  opacity: 0.45;
+}
+.result-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.result-trip {
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 /* ---------- Skip to search ---------- */
@@ -332,21 +587,22 @@ html:has(.landing) {
   gap: 0.4rem;
   padding: 0.7rem 1.1rem;
   border-radius: 999px;
-  background: var(--l-glow);
-  color: var(--l-near);
-  font-weight: 600;
-  box-shadow: 0 6px 24px rgb(18 15 46 / 0.35);
+  background: var(--l-action);
+  color: var(--l-action-ink);
+  font-weight: 500;
+  box-shadow: 0 6px 24px rgb(15 35 37 / 0.3);
   transition:
     opacity 0.2s,
     transform 0.2s;
 }
 .jump:hover {
-  background: #ffb874;
+  background: color-mix(in oklch, var(--l-action) 88%, var(--ink-soft));
 }
 .jump:focus-visible {
-  outline: 3px solid #fff4e2;
+  outline: 3px solid var(--l-glow);
   outline-offset: 3px;
 }
+.landing:not([data-past-hero]) .jump,
 .landing[data-at-start] .jump {
   opacity: 0;
   transform: translateY(12px);
@@ -358,30 +614,96 @@ html:has(.landing) {
   scroll-margin-top: 0;
   background: var(--mist);
   color: var(--ink);
+  /* The hero's dark pill carries into the one action it was leading to. */
+  --primary: var(--l-action);
+  --primary-foreground: var(--l-action-ink);
+  --ring: var(--l-action);
+}
+.dark .landing-start {
+  --card: rgb(255 255 255 / 0.05);
+  --input: rgb(255 255 255 / 0.16);
+  --border: rgb(255 255 255 / 0.14);
+  --muted-foreground: #a9c2bd;
+}
+.example {
+  border-color: color-mix(in oklch, var(--ink) 18%, transparent);
+  background: rgb(255 255 255 / 0.35);
+}
+.dark .example {
+  background: rgb(255 255 255 / 0.04);
+}
+.example:hover {
+  border-color: color-mix(in oklch, var(--ink) 35%, transparent);
 }
 .start-title {
   font-family: var(--display);
-  font-size: clamp(2.75rem, 7vw, 5.5rem);
-  font-weight: 800;
-  line-height: 0.95;
+  font-size: clamp(2.4rem, 5.6vw, 4.4rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
 }
 
+/* Reduced motion: every scene rests in its finished state, laid out in normal flow, nothing hidden. */
 @media (prefers-reduced-motion: reduce) {
   .scene-hero {
     height: 100svh;
   }
-  .scene-say {
+  .scene-say,
+  .scene-ride {
     height: auto;
   }
-  .scene-say .scene-stage {
+  .scene-say .scene-stage,
+  .scene-ride .scene-stage {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
     height: auto;
     min-height: 100svh;
+    padding: 5rem 16px;
+  }
+  .say-title,
+  .say-prompt,
+  .say-caption,
+  .say-chips,
+  .chip {
+    position: static;
+    transform: none;
+    opacity: 1;
+  }
+  .say-caption {
+    width: min(100%, 44ch);
+  }
+  .ch {
+    opacity: 1;
+  }
+  .phrase {
+    background-size: 100% 0.09em;
+  }
+  .say-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    max-width: 48rem;
   }
   .scene-ride {
+    background: var(--mist);
+  }
+  .ride-morning,
+  .wire,
+  .train {
     display: none;
   }
-  .scroll-cue span {
-    animation: none;
+  .result {
+    position: static;
+    padding: 0;
+    opacity: 1;
+    transform: none;
+  }
+  .result-route {
+    stroke-dashoffset: 0;
   }
 }

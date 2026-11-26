@@ -178,6 +178,9 @@ export function NearbyPanel({
             <input
               ref={input}
               type="search"
+              name="place"
+              autoComplete="off"
+              spellCheck={false}
               defaultValue={search.query}
               placeholder={n("searchPlaceholder")}
               aria-label={n("search")}

@@ -220,7 +220,7 @@ export function ResultsMap({
         });
         map.on("load", () => {
           if (!map) return;
-          if (theme === "dark") greyBasemap(map);
+          greyBasemap(map, theme);
           addLayers(map);
           bindEvents(map, maplibregl);
           syncPins.current = bindPins(map, maplibregl, pins.current);
@@ -786,7 +786,7 @@ function addCrimeLayer(
       type: "line",
       source: "crime",
       layout: { visibility: "none" },
-      paint: { "line-color": "#6b7280", "line-width": 0.6, "line-opacity": 0.6 },
+      paint: { "line-color": "#6f8c8a", "line-width": 0.6, "line-opacity": 0.6 },
     },
     "approx-fill",
   );
@@ -900,10 +900,10 @@ function addLayers(map: MapLibreMap) {
     filter: ["has", "point_count"],
     // A dark disc with a light ring, in the pins' style.
     paint: {
-      "circle-color": "#1c1c1f",
+      "circle-color": "#163236",
       "circle-opacity": 0.95,
       "circle-radius": ["step", ["get", "point_count"], 16, 10, 20, 50, 26],
-      "circle-stroke-color": "#f4f4f5",
+      "circle-stroke-color": "#eef4f1",
       "circle-stroke-width": 2,
     },
   });
@@ -929,7 +929,7 @@ function addLayers(map: MapLibreMap) {
       source,
       ...(filter ? { filter } : {}),
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#141416", "line-width": 8, "line-opacity": 0.85 },
+      paint: { "line-color": "#102326", "line-width": 8, "line-opacity": 0.85 },
     });
   // The walk to the nearest place behind a hovered trip line.
   map.addSource("amenity-line", { type: "geojson", data: empty });

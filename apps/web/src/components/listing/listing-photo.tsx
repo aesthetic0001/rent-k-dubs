@@ -22,6 +22,8 @@ export function ListingPhoto({
     <img
       src={src}
       alt=""
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       className={className}
       onError={() => setFailed(src)}

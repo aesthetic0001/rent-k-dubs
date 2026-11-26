@@ -12,9 +12,48 @@ export function ScrollScenes() {
     const scenes = Array.from(document.querySelectorAll<HTMLElement>("[data-scene]"));
     const landing = document.querySelector<HTMLElement>(".landing");
     const start = document.getElementById("start");
+    const jumps = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('.landing a[href="#start"]'),
+    );
+    const prompt = document.getElementById("prompt");
+
+    // "Start your search" and "Skip to search" land in the box, ready to type, not just near it.
+    // A fragment jump would move focus to #start itself, so scroll there by hand instead.
+    const focusPrompt = (event: MouseEvent) => {
+      if (!start || !prompt) return;
+      event.preventDefault();
+      start.scrollIntoView();
+      prompt.focus({ preventScroll: true });
+    };
+    for (const jump of jumps) jump.addEventListener("click", focusPrompt);
+
+    // Hide "Skip to search" once the search section is on screen, with or without motion.
+    const observer =
+      landing && start
+        ? new IntersectionObserver(
+            ([entry]) => landing.toggleAttribute("data-at-start", !!entry?.isIntersecting),
+            { rootMargin: "0px 0px -40% 0px" },
+          )
+        : null;
+    if (start) observer?.observe(start);
+    // "Skip to search" waits until the hero, with its own button, has scrolled away.
+    const hero = document.querySelector(".scene-hero");
+    const heroObserver =
+      landing && hero
+        ? new IntersectionObserver(([entry]) =>
+            landing.toggleAttribute("data-past-hero", !entry?.isIntersecting),
+          )
+        : null;
+    if (hero) heroObserver?.observe(hero);
+    const cleanUp = () => {
+      for (const jump of jumps) jump.removeEventListener("click", focusPrompt);
+      observer?.disconnect();
+      heroObserver?.disconnect();
+    };
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       for (const scene of scenes) scene.style.setProperty("--p", scene.dataset.still ?? "1");
-      return;
+      return cleanUp;
     }
 
     let frame = 0;
@@ -27,10 +66,6 @@ export function ScrollScenes() {
         const p = range > 0 ? Math.min(1, Math.max(0, -rect.top / range)) : 0;
         scene.style.setProperty("--p", p.toFixed(4));
       }
-      // Hide "Skip to search" once the search section is on screen.
-      if (landing && start) {
-        landing.toggleAttribute("data-at-start", start.getBoundingClientRect().top < vh * 0.6);
-      }
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -40,6 +75,7 @@ export function ScrollScenes() {
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
+      cleanUp();
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);

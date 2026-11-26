@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Form from "next/form";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +41,15 @@ export function PromptBox({ defaultPrompt = "" }: { defaultPrompt?: string }) {
           }
         }}
       />
+      <p className="text-muted-foreground text-xs text-pretty">
+        {t("landing.aiNotice")}{" "}
+        <Link
+          href="/privacy#request"
+          className="hover:text-foreground underline underline-offset-4"
+        >
+          {t("landing.aiNoticeLink")}
+        </Link>
+      </p>
       <Button type="submit" size="lg" className="h-11 self-stretch px-5 text-base sm:self-end">
         {t("landing.submit")}
         <ArrowRight aria-hidden data-icon="inline-end" />

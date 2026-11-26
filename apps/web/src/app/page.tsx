@@ -1,12 +1,29 @@
 import { ArrowDown } from "lucide-react";
 import Link from "next/link";
-import { HeroScene, RideScene, SayScene } from "@/components/landing/scenes";
+import { HeroScene, type HeroStats, RideScene, SayScene } from "@/components/landing/scenes";
 import { ScrollScenes } from "@/components/landing/scroll-scenes";
 import { PromptBox } from "@/components/search/prompt-box";
+import { getDatabaseStatus } from "@/lib/db";
 import { t, type MessageKey } from "@/lib/format/messages";
 import "@/components/landing/landing.css";
 
 const examples = ["student", "couple", "family"] as const;
+
+/** The hero band's counts, read live; null keeps the band to its note when the database is down. */
+async function heroStats(): Promise<HeroStats> {
+  try {
+    const { tables } = await getDatabaseStatus();
+    return tables
+      ? {
+          listings: tables.listings,
+          neighbourhoods: tables.neighbourhoods,
+          sources: tables.sources,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function searchHref(prompt: string) {
   return `/search?q=${encodeURIComponent(prompt)}`;
@@ -16,11 +33,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // "Change request" on /search comes back to #start with the prompt, so it can be edited.
   const { q } = await searchParams;
   const prompt = typeof q === "string" ? q.slice(0, 4000) : "";
+  const stats = await heroStats();
 
   return (
     <div className="landing">
       <ScrollScenes />
-      <HeroScene />
+      <HeroScene stats={stats} />
       <SayScene />
       <RideScene />
       <a href="#start" className="jump">
@@ -51,12 +69,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                     <li key={id}>
                       <Link
                         href={searchHref(prompt)}
-                        className="bg-card hover:bg-accent focus-visible:ring-ring/50 flex flex-col gap-0.5 rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-3"
+                        className="example focus-visible:ring-ring/50 flex flex-col gap-0.5 rounded-xl border px-4 py-3 text-sm transition-colors outline-none focus-visible:ring-3"
                       >
                         <span className="font-medium">
                           {t(`landing.examples.${id}.label` as MessageKey)}
                         </span>
-                        <span className="text-muted-foreground line-clamp-2">{prompt}</span>
+                        <span className="line-clamp-2 text-[var(--ink-soft)]">{prompt}</span>
                       </Link>
                     </li>
                   );
