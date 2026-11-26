@@ -1,0 +1,41 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: rentkdubs-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - name: Deploy Docker Compose stack over SSH
+        env:
+          VPS_IP: ${{ secrets.VPS_IP }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        shell: bash
+        run: |
+          : "${VPS_IP:?Set VPS_IP in the production environment}"
+          : "${VPS_PASSWORD:?Set VPS_PASSWORD in the production environment}"
+          umask 077
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$VPS_PASSWORD"' > "$ssh_dir/askpass"
+          chmod 700 "$ssh_dir/askpass"
+          printf '%s\n' '155.138.150.25 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOuG2tDfu9q3wQCvNM9xJt+qDKqz6JHjLDOwwmM4PQ+r' > "$ssh_dir/known_hosts"
+          SSH_ASKPASS="$ssh_dir/askpass" SSH_ASKPASS_REQUIRE=force ssh -nT \
+            -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1 \
+            -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+            "root@$VPS_IP" \
+            "runuser -u rentkdubs-deploy -- flock -w 600 /home/rentkdubs-deploy/.deploy.lock bash -c 'cd /srv/rentkdubs && git pull --ff-only origin main && exec bash deploy.sh --production'"

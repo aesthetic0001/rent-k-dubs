@@ -14,6 +14,30 @@
 # changes when GTFS or OSM do (DEPLOY.md §4).
 set -euo pipefail
 
+if [[ ${1:-} == --production ]]; then
+  cd "$(dirname "$0")"
+  if ! docker compose config --quiet 2>/dev/null; then
+    echo 'Check the production .env and Docker Compose configuration on the VPS.' >&2
+    exit 1
+  fi
+
+  site_host=$(docker compose config --format json | \
+    python3 -c 'import json, sys; print(json.load(sys.stdin)["services"]["caddy"]["environment"]["SITE_HOST"])')
+  git log -1 --oneline
+  docker compose build
+  docker compose run --rm --no-deps -T worker sh -ec '
+    if [ -z "${DATABASE_URL:-}" ] && [ "${SEARCH_FIXTURES:-}" = 1 ]; then
+      exit 0
+    fi
+    exec node db/migrate.mjs
+  '
+  docker compose up --detach --wait --wait-timeout 240
+  curl -fsS --retry 10 --retry-all-errors --retry-delay 5 --max-time 10 \
+    --output /dev/null "https://$site_host/status"
+  docker compose ps
+  exit 0
+fi
+
 : "${DEPLOY_HOST:?set DEPLOY_HOST, e.g. root@203.0.113.7}"
 DEPLOY_PATH="${DEPLOY_PATH:-/srv/rentkdubs}"
 SERVICES="${SERVICES:-web worker}"
