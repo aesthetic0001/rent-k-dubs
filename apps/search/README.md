@@ -38,10 +38,9 @@ NeMo archive), or `SEARCH_T5_ADAPTER` (the PEFT directory).
 
 ## Compose
 
-Set `SEARCH_EXTRACTOR_URL=http://search-extractor:8081` in the root `.env` and
-run `docker compose --profile search up -d --build search-extractor web`.
-The CPU extractor stays on the private Compose network. The `search-models`
-volume retains downloaded weights when the service is recreated.
+The [all-in-one deployment](../../docs/deployment.md) starts the CPU extractor
+on the private Compose network and configures the web app to use it. The
+`search-models` volume retains downloaded weights when the service is recreated.
 
 ## Evaluation
 

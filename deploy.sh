@@ -5,7 +5,7 @@
 #
 #   DEPLOY_HOST=root@203.0.113.7 SITE_HOST=203-0-113-7.sslip.io ./deploy.sh
 #
-# Optional: DEPLOY_PATH (default /srv/rentkdubs), SERVICES (default "web worker"),
+# Optional: DEPLOY_PATH (default /srv/rentkdubs), SERVICES (default "web search-extractor poi"),
 # NO_HEALTHCHECK=1 to skip the final HTTP check.
 #
 # What it does: SSH in, hard-reset the checkout to origin/main (the box is a mirror of
@@ -24,14 +24,13 @@ if [[ ${1:-} == --production ]]; then
   site_host=$(docker compose config --format json | \
     python3 -c 'import json, sys; print(json.load(sys.stdin)["services"]["caddy"]["environment"]["SITE_HOST"])')
   git log -1 --oneline
+  docker compose --profile scraper stop --timeout 15 worker
+  docker compose up --detach --wait --wait-timeout 120 db
   docker compose build
-  docker compose run --rm --no-deps -T worker sh -ec '
-    if [ -z "${DATABASE_URL:-}" ] && [ "${SEARCH_FIXTURES:-}" = 1 ]; then
-      exit 0
-    fi
-    exec node db/migrate.mjs
-  '
-  docker compose up --detach --wait --wait-timeout 240
+  docker compose run --build --rm --no-deps -T maintenance
+  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d rentkdubs \
+    -c 'GRANT INSERT, UPDATE ON public.ai_cache TO rentkdubs_app'
+  docker compose up --detach --wait --wait-timeout 600
   curl -fsS --retry 10 --retry-all-errors --retry-delay 5 --max-time 10 \
     --output /dev/null "https://$site_host/status"
   docker compose ps
@@ -40,7 +39,7 @@ fi
 
 : "${DEPLOY_HOST:?set DEPLOY_HOST, e.g. root@203.0.113.7}"
 DEPLOY_PATH="${DEPLOY_PATH:-/srv/rentkdubs}"
-SERVICES="${SERVICES:-web worker}"
+SERVICES="${SERVICES:-web search-extractor poi}"
 BRANCH="${BRANCH:-main}"
 
 echo "==> $DEPLOY_HOST:$DEPLOY_PATH  ($SERVICES from $BRANCH)"

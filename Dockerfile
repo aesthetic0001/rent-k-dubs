@@ -30,6 +30,11 @@ COPY packages/shared/package.json packages/shared/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
+# Database-only commands share the application dependencies without installing Chromium.
+FROM deps AS maintenance
+COPY . .
+USER node
+
 # Source on top of the installed tree. The copied node_modules keep pnpm's relative
 # workspace symlinks, which still point at /app/packages/shared.
 FROM base AS build

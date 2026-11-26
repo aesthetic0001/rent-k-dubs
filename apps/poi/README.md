@@ -43,10 +43,9 @@ curl -fsS http://127.0.0.1:8082/resolve -H 'Content-Type: application/json' \
 
 ## Compose
 
-Set `POI_SERVICE_URL=http://poi:8082` in the root `.env` and run
-`docker compose --profile poi up -d --build poi web`. The service is on the
-private Compose network. The `poi-models` volume keeps the downloaded model
-between container restarts.
+The [all-in-one deployment](../../docs/deployment.md) migrates PostgreSQL and
+starts this service on the private Compose network. The `poi-models` volume
+keeps the downloaded model between container restarts.
 
 POI data from OpenStreetMap is © OpenStreetMap contributors and is available
 under the [Open Database License](https://www.openstreetmap.org/copyright).

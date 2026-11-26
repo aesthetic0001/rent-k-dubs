@@ -31,10 +31,10 @@ jobs:
           trap 'rm -rf "$ssh_dir"' EXIT
           printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$VPS_PASSWORD"' > "$ssh_dir/askpass"
           chmod 700 "$ssh_dir/askpass"
-          printf '%s\n' '155.138.150.25 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOuG2tDfu9q3wQCvNM9xJt+qDKqz6JHjLDOwwmM4PQ+r' > "$ssh_dir/known_hosts"
+          printf '%s\n' 'rentkdubs-vps ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOuG2tDfu9q3wQCvNM9xJt+qDKqz6JHjLDOwwmM4PQ+r' > "$ssh_dir/known_hosts"
           SSH_ASKPASS="$ssh_dir/askpass" SSH_ASKPASS_REQUIRE=force ssh -nT \
             -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1 \
-            -o StrictHostKeyChecking=yes \
+            -o StrictHostKeyChecking=yes -o HostKeyAlias=rentkdubs-vps \
             -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o ConnectTimeout=15 \
             -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
             "root@$VPS_IP" \

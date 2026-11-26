@@ -1,51 +1,90 @@
-# docker-compose.yml — owner: D (P0.9)
-#
-# The whole production stack on one Vultr instance: Caddy (TLS) → web (Next.js) and
-# worker (ingest + precompute).
-#
-#   docker compose up -d --build          # web + worker + caddy
-#
-# Travel is straight-line distance between the two addresses, so nothing here renders a route.
-#
-# Values come from a manually-created `.env` next to this file (variables are listed in
-# SPEC.md §20). `.env` is git-ignored; `DATABASE_URL` and `GEMINI_API_KEY` only live there.
+# Caddy publishes HTTPS. The web app, models and database use the private Compose network.
+# Run bash deploy.sh --production after configuring .env and local/db on the host.
 name: rentkdubs
 
+x-app-database: &app-database
+  DATABASE_URL: postgres://rentkdubs_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/rentkdubs?sslmode=verify-full
+
+secrets:
+  db_owner_password:
+    file: ./local/db/owner-password
+
 services:
+  db:
+    image: timescale/timescaledb-ha:pg17-ts2.32@sha256:2491132fa6cf3621955727de400c33d1132d504628ca7617eee4d0ea571eaccf
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rentkdubs
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    secrets: [db_owner_password]
+    command: [postgres, -c, ssl=on, -c, ssl_cert_file=/db-tls/server.crt, -c, ssl_key_file=/db-tls/server.key]
+    volumes:
+      - db-data:/home/postgres/pgdata/data
+      - ./local/db/tls:/db-tls:ro
+      - ./db/init-container.sh:/docker-entrypoint-initdb.d/020_app.sh:ro
+    healthcheck:
+      test: [CMD, pg_isready, -h, '127.0.0.1', -U, postgres, -d, rentkdubs]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  maintenance:
+    profiles: [tools]
+    build:
+      context: .
+      target: maintenance
+    environment:
+      NODE_EXTRA_CA_CERTS: /db-ca.crt
+    secrets: [db_owner_password]
+    volumes:
+      - ./local/db/tls/server.crt:/db-ca.crt:ro
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        export DATABASE_URL="postgres://postgres:$$(cat /run/secrets/db_owner_password)@db:5432/rentkdubs?sslmode=verify-full"
+        exec "$$@"
+      - --
+    command: [node, db/migrate.mjs]
+
   web:
     build:
       context: .
       target: web
       args:
-        # Inlined at build time. Empty ⇒ OpenFreeMap basemap (SPEC 20).
         NEXT_PUBLIC_MAPTILER_KEY: ${NEXT_PUBLIC_MAPTILER_KEY:-}
     restart: unless-stopped
     env_file: .env
-    # No router is wired in: travel is the straight-line distance between the listing and the target.
-    # No host ports: Caddy reaches the app by service name on the compose network.
+    environment:
+      <<: *app-database
+      NODE_EXTRA_CA_CERTS: /db-ca.crt
+      SEARCH_EXTRACTOR_URL: http://search-extractor:8081
+      POI_SERVICE_URL: http://poi:8082
+    volumes:
+      - ./local/db/tls/server.crt:/db-ca.crt:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      search-extractor:
+        condition: service_healthy
+      poi:
+        condition: service_healthy
     expose:
       - "3000"
 
   worker:
+    profiles: [scraper]
     build:
       context: .
       target: worker
-    # on-failure, not unless-stopped: while the entry point is still a no-op it exits
-    # 0, and a clean exit must not restart-loop. Real crashes still come back.
     restart: on-failure
-    # Chromium keeps page state in /dev/shm; Docker's 64 MB default crashes it on big pages.
     shm_size: 1gb
     env_file: .env
     volumes:
-      # The ingest pipeline writes its caches through `new URL('../../.cache/…', import.meta.url)`,
-      # so they land next to the source at /app/apps/worker/.cache whatever the cwd is. A named
-      # volume keeps them across `--build` and `up` re-creates: losing the detail cache re-fetches
-      # thousands of listing pages (and risks a block), and the Gemini cache costs real money.
-      # `docker compose down -v` still deletes it — that is the only command that should.
       - worker-cache:/app/apps/worker/.cache
 
   search-extractor:
-    profiles: ["search"]
     build:
       context: apps/search
     restart: unless-stopped
@@ -53,18 +92,35 @@ services:
       - "8081"
     volumes:
       - search-models:/models
+    healthcheck:
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8081/health', timeout=3).close()"]
+      start_period: 5m
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   poi:
-    profiles: ["poi"]
     build:
       context: .
       dockerfile: apps/poi/Dockerfile
     restart: unless-stopped
-    env_file: .env
+    environment:
+      <<: *app-database
+      PGSSLROOTCERT: /db-ca.crt
+    depends_on:
+      db:
+        condition: service_healthy
     expose:
       - "8082"
     volumes:
       - poi-models:/models
+      - ./local/db/tls/server.crt:/db-ca.crt:ro
+    healthcheck:
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8082/health', timeout=3).close()"]
+      start_period: 5m
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   caddy:
     image: caddy:2-alpine
@@ -74,8 +130,6 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      # <ip-with-dashes>.sslip.io resolves to the instance's public IP, so Caddy can
-      # get a real certificate without a domain. Set it in .env.
       SITE_HOST: ${SITE_HOST:?set SITE_HOST in .env, e.g. 203-0-113-7.sslip.io}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -85,12 +139,8 @@ services:
       web:
         condition: service_healthy
 
-  # The router (OpenTripPlanner, #24) runs as its own container, outside this stack:
-  # otp/build.sh builds the Waterloo graph and otp/serve.sh serves it on the host's
-  # 127.0.0.1:8080. The web app draws routed paths and times through it when OTP_URL is set;
-  # search ranking still uses distance estimates.
-
 volumes:
+  db-data:
   search-models:
   poi-models:
   caddy_data:

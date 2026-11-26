@@ -31,8 +31,8 @@ describe("getDatabaseStatus", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it("returns real status metrics without exposing the connection URL", async () => {
-    process.env.DATABASE_URL = "postgresql://user:secret@example.test/db?sslmode=require";
+  it.each(["require", "verify-full"])("returns status metrics with sslmode=%s without exposing the URL", async (sslMode) => {
+    process.env.DATABASE_URL = `postgresql://user:secret@example.test/db?sslmode=${sslMode}`;
     query.mockResolvedValueOnce([
       {
         database: "tsdb",

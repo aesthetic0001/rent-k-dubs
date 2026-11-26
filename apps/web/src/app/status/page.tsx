@@ -50,7 +50,7 @@ export default async function StatusPage() {
         </p>
         {status.error === "missing_config" && status.configured && (
           <p className="text-muted-foreground mt-2 text-sm">
-            DATABASE_URL must be a PostgreSQL URL with sslmode=require.
+            DATABASE_URL must be a PostgreSQL URL with sslmode=require or sslmode=verify-full.
           </p>
         )}
         {status.error === "connection_failed" && (

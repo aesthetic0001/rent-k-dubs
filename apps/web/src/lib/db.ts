@@ -30,8 +30,9 @@ export function getClient(): Sql | null {
   if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") {
     throw new Error("DATABASE_URL must use postgres:// or postgresql://");
   }
-  if (parsed.searchParams.get("sslmode") !== "require") {
-    throw new Error("DATABASE_URL must include sslmode=require");
+  const sslMode = parsed.searchParams.get("sslmode");
+  if (sslMode !== "require" && sslMode !== "verify-full") {
+    throw new Error("DATABASE_URL must include sslmode=require or sslmode=verify-full");
   }
   client ??= postgres(url, {
     max: 2,
