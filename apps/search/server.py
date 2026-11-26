@@ -13,6 +13,7 @@ from gliner2 import AutoExtractor
 from peft import PeftModel
 from transformers import AutoConfig, AutoTokenizer, T5ForConditionalGeneration
 from labels import AMENITIES, BOOLEANS, BOUNDS, CHOICES, DECIDE_CHOICES, MODES, NUMBERS, generic_amenity
+from model_artifacts import model_paths
 
 FIELDS = {
     "rent": "Verbatim monthly rental budget amount, including currency or scale words if present. Exclude annual income, percentages and other quantities.",
@@ -38,7 +39,6 @@ FIELDS = {
     "tripPreference": "Verbatim proximity wording tied to a requested destination, such as near, close to, or walking distance to.",
 }
 
-MODEL = "fastino/gliner2.5-base-v1"
 WRITTEN_AMOUNT = re.compile(r"(?:(?:cad|c\$|\$)\s*)?[\d,.]+\s*k?(?:\s*(?:cad|dollars?|bucks))?", re.I)
 NUMBER = re.compile(r"[0-9](?:\s*[0-9])*\s*(?:\.\s*[0-9](?:\s*[0-9])*)?")
 BREAKS = re.compile(r"[,;!?\n]|\.(?=\s|$)")
@@ -234,18 +234,18 @@ class Extractor:
         self.span_threshold = float(os.getenv("SEARCH_MODEL_SPAN_THRESHOLD", "0.5"))
         if not 0 < self.span_threshold <= 1:
             raise ValueError("SEARCH_MODEL_SPAN_THRESHOLD must be greater than 0 and at most 1")
-        self.model = AutoExtractor.from_pretrained(os.getenv("GLINER_MODEL", MODEL)).to(self.device)
+        gliner, config_dir, checkpoint, adapter = model_paths()
+        self.model = AutoExtractor.from_pretrained(gliner).to(self.device)
         self.schema = self.model.create_schema().entities(FIELDS)
         classifier_model = os.getenv("SEARCH_CLASSIFIER_MODEL")
         self.classifier = AutoExtractor.from_pretrained(classifier_model).to(self.device) if classifier_model else self.model
-        config_dir = os.environ["SEARCH_T5_CONFIG"]
         self.tokenizer = AutoTokenizer.from_pretrained(config_dir, local_files_only=True)
         config = AutoConfig.from_pretrained(config_dir, local_files_only=True)
         base = T5ForConditionalGeneration(config)
-        with tarfile.open(os.environ["SEARCH_T5_CHECKPOINT"]) as archive:
+        with tarfile.open(checkpoint) as archive:
             weights = torch.load(archive.extractfile("./model_weights.ckpt"), map_location="cpu", weights_only=True)
         base.load_state_dict({key.removeprefix("model."): value for key, value in weights.items()})
-        self.money = PeftModel.from_pretrained(base, os.environ["SEARCH_T5_ADAPTER"]).to(self.device).eval()
+        self.money = PeftModel.from_pretrained(base, adapter).to(self.device).eval()
 
     @torch.inference_mode()
     def extract(self, prompt, places=(), covered=()):

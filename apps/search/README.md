@@ -6,39 +6,42 @@ Set `SEARCH_EXTRACTOR_URL` on the web app to enable the service for `/api/search
 
 ## Run on the workstation
 
-With the model bundle under `local/models` and the experiment Python environment installed, run from the repository root.
+With the extractor dependencies installed, run from the repository root.
 
 ```sh
 export HF_HOME="$PWD/local/models/hf"
-export SEARCH_T5_CONFIG="$PWD/local/models/nvidia/t5-small"
-export SEARCH_T5_CHECKPOINT="$PWD/local/models/nvidia/decoder.nemo"
-export SEARCH_T5_ADAPTER="$PWD/local/models/nvidia/dollar-adapter-v5"
 local/.venv/bin/python apps/search/server.py
 ```
 
-Set `SEARCH_EXTRACTOR_URL=http://127.0.0.1:8081` for a web process on the same host. `GET /health` is available once the models are loaded. `SEARCH_MODEL_THREADS` defaults to two. Set `SEARCH_CLASSIFIER_MODEL=fastino/GLiNER2.5-Decide` to classify extracted spans with preset choices, such as travel mode, amenity category, and lease type. The base path interprets bounds. The web parser makes criteria must-haves by default and reads explicit preference cues from the prompt. Tune label descriptions in [labels.py](labels.py).
+The first startup downloads the [V14 GLiNER checkpoint](https://huggingface.co/aesthetic0001/rent-k-dubs-search-v14/tree/91024c659b8efcba7f31986b220a7faa3a933402),
+the [V5 rent adapter](https://huggingface.co/aesthetic0001/rent-k-dubs-rent-t5-adapter-v5/tree/0105f7f5de692df516479b7198ad917ff3de9fd7),
+and their T5 dependencies. The downloader pins Hub commits and checks the SHA-256 of the
+[NVIDIA NeMo ITN decoder 1.11.0](https://catalog.ngc.nvidia.com/orgs/nvidia/nemo/models/itn_en_t5/1.11.0/file-browser).
+NVIDIA provides that decoder under the terms in its model card. The service reuses the model cache on later starts.
+Set `HF_HUB_OFFLINE=1` to require cached artifacts or local overrides.
 
-Set `SEARCH_MODEL_DEVICE=cuda` in a CUDA-enabled PyTorch environment to run extraction, classification, and rent normalization on an NVIDIA GPU. The default is `cpu`.
+Set `SEARCH_EXTRACTOR_URL=http://127.0.0.1:8081` for a web process on the same host.
+`GET /health` becomes available once the models are loaded. `SEARCH_MODEL_THREADS`
+defaults to two. Set `SEARCH_CLASSIFIER_MODEL=fastino/GLiNER2.5-Decide` to use
+the optional scoped classifier. The web parser makes criteria must-haves by
+default and reads explicit preference cues from the prompt. Field definitions
+and closed choices live in [server.py](server.py) and [labels.py](labels.py).
 
-Set `GLINER_MODEL` to a compatible local GLiNER checkpoint for comparison runs.
-The benchmarked V14 weights and T5 files are workstation model artifacts.
-`SEARCH_MODEL_SPAN_THRESHOLD` controls span extraction and defaults to `0.5`.
-Measure both recall and precision on held-out queries before choosing a threshold.
+Set `SEARCH_MODEL_DEVICE=cuda` in a CUDA-enabled PyTorch environment to run
+extraction, classification, and rent normalization on an NVIDIA GPU. The default
+device is `cpu`. The model confidence threshold defaults to `0.5` and can be
+set with `SEARCH_MODEL_SPAN_THRESHOLD`.
 
-## Container
+For an existing local bundle, override any of `GLINER_MODEL`, `SEARCH_T5_CONFIG`
+(the T5 architecture and tokenizer directory), `SEARCH_T5_CHECKPOINT` (the
+NeMo archive), or `SEARCH_T5_ADAPTER` (the PEFT directory).
 
-Build with `docker build -t rent-search-extractor apps/search`. On the workstation that owns the model files, run the container as your user so it can read the adapter.
+## Compose
 
-```sh
-docker run --rm --name search-extractor --user "$(id -u):$(id -g)" \
-  --network rentkdubs_default -v "$PWD/local/models:/models:ro" \
-  -e HF_HOME=/models/hf -e HF_HUB_OFFLINE=1 \
-  -e SEARCH_T5_CONFIG=/models/nvidia/t5-small \
-  -e SEARCH_T5_CHECKPOINT=/models/nvidia/decoder.nemo \
-  -e SEARCH_T5_ADAPTER=/models/nvidia/dollar-adapter-v5 rent-search-extractor
-```
-
-On that private network, set `SEARCH_EXTRACTOR_URL=http://search-extractor:8081` on the web app.
+Set `SEARCH_EXTRACTOR_URL=http://search-extractor:8081` in the root `.env` and
+run `docker compose --profile search up -d --build search-extractor web`.
+The CPU extractor stays on the private Compose network. The `search-models`
+volume retains downloaded weights when the service is recreated.
 
 ## Evaluation
 
