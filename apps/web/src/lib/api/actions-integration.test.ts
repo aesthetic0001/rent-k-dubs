@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { baseIntent, sampleListings, travelIntent } from '@rentkdubs/shared/fixtures';
+import { baseIntent, sampleListings } from '@rentkdubs/shared/fixtures';
 import { DetailResponseSchema } from '@rentkdubs/shared/schemas';
 import { parseAndSearch, resolveDestination, restoreSearch, runSearch } from '../store/actions';
 import { placePins } from '../../components/map/map-data';
@@ -71,7 +71,7 @@ test('actual A actions consume B responses and retain nested listing selection a
     expect(choice.ok).toBe(true);
     if (!choice.ok || choice.resolution.status !== 'ambiguous') throw Error('Expected campus choices');
     expect(choice.resolution.choices.length).toBeGreaterThan(1);
-    await parseAndSearch('near Conestoga College', { store, ...transport });
+    await parseAndSearch('ideally near Conestoga College', { store, ...transport });
     expect(store.getState().destinations[0].resolution.status).toBe('ambiguous');
     const selected = choice.resolution.choices[0];
     store.getState().updateIntent(intent => ({ ...intent, travelTargets: intent.travelTargets.map(target => ({ ...target, resolved: selected.resolved, label: selected.label })) }));
@@ -88,21 +88,5 @@ test('actual A actions consume B responses and retain nested listing selection a
     const intent = { ...baseIntent, rawPrompt: '', fieldSources: {}, droppedRequests: [] };
     const detail = DetailResponseSchema.parse(await (await api.detail(new Request('http://localhost/api/listings/x?intent=' + encodeURIComponent(JSON.stringify(intent))), { params: Promise.resolve({ id: result.listing.id }) })).json());
     expect(detail.listing.id).toBe(store.getState().selectedListingId);
-  } finally { api.jobs.dispose(); }
-});
-
-test('actual polling consumes an estimated-travel job and keeps its nested selection', async () => {
-  const api = createRuntime({ env: {}, dependencies: fixtureDependencies });
-  const transport = bridge(api);
-  const store = createAppStore();
-  store.getState().setIntent({ ...travelIntent, travelTargets: travelIntent.travelTargets.map(target => ({ ...target, hard: false })), numericExtreme: { field: 'travel', targetId: travelIntent.travelTargets[0].id, direction: 'min', percentage: 10, minimumCount: 10 } });
-  store.getState().setSelectedListingId(sampleListings[0].id);
-  try {
-    await runSearch({ store, ...transport, sleep: () => new Promise(resolve => setTimeout(resolve, 0)) });
-    expect(transport.paths.some(path => path.startsWith('/api/listings/search/jobs/'))).toBe(true);
-    expect(store.getState().status).toBe('ready');
-    expect(store.getState().results.length).toBeGreaterThan(0);
-    expect(store.getState().selectedListingId).toBe(sampleListings[0].id);
-    expect(store.getState().results.every(result => !('id' in result))).toBe(true);
   } finally { api.jobs.dispose(); }
 });

@@ -2,11 +2,19 @@ import { type SearchIntent } from '../../../../../packages/shared/schemas/index'
 import { civicAreaMatches, type CivicArea } from './civic-areas';
 import { configuredAreas } from './fallback';
 import { safetyPreference } from './safety-preference';
+import { isRequired } from './requirement';
 export function cleanAIIntent(intent: SearchIntent, prompt: string, catalogue: CivicArea[] = []): SearchIntent {
   const source = (key: string) => { const evidence = intent.fieldSources[key]; return evidence?.source === 'ai_prompt' && !!evidence.phrase && prompt.toLowerCase().includes(evidence.phrase.toLowerCase()); };
+  const required = (key: string) => {
+    const phrase = intent.fieldSources[key].phrase!;
+    const start = prompt.toLowerCase().indexOf(phrase.toLowerCase());
+    return isRequired(prompt, start, start + phrase.length);
+  };
   const drop = (field: string) => intent.droppedRequests.push({ phrase: field, reason: 'AI interpretation lacked explicit source evidence; review this filter.' });
   for (const field of Object.keys(intent.criteria) as (keyof SearchIntent['criteria'])[]) {
-    if (!source(`criteria.${field}`)) { delete intent.criteria[field]; drop(field); }
+    const key = `criteria.${field}`;
+    if (!source(key)) { delete intent.criteria[field]; drop(field); }
+    else intent.criteria[field]!.hard = required(key);
   }
   intent.areas = intent.areas.filter(area => {
     const evidence = intent.fieldSources.areas?.phrase?.toLowerCase() ?? '';
@@ -16,7 +24,10 @@ export function cleanAIIntent(intent: SearchIntent, prompt: string, catalogue: C
   intent.travelTargets = intent.travelTargets.filter(t => {
     delete t.resolved;
     if (t.normalizedQuery?.toLowerCase() === t.query?.toLowerCase()) delete t.normalizedQuery;
-    if (!source(`travelTargets.${t.id}`) || t.kind === 'place' && (!t.query || !prompt.toLowerCase().includes(t.query.toLowerCase()))) { drop(t.label); return false; } return true;
+    const key = `travelTargets.${t.id}`;
+    if (!source(key) || t.kind === 'place' && (!t.query || !prompt.toLowerCase().includes(t.query.toLowerCase()))) { drop(t.label); return false; }
+    t.hard = required(key);
+    return true;
   });
   if (intent.household) {
     for (const field of ['annualIncomeCad', 'people'] as const) if (intent.household[field] !== undefined && !source(`household.${field}`)) { delete intent.household[field]; drop(`household.${field}`); }
@@ -30,7 +41,6 @@ export function cleanAIIntent(intent: SearchIntent, prompt: string, catalogue: C
     intent.fieldSources.safety = { source: 'ai_prompt', phrase: safety.phrase };
   } else if (intent.safety.enabled) { intent.safety = { enabled:false,hard:false }; drop('safety'); }
   if (intent.sortBy !== 'best_match' && !source('sortBy')) { intent.sortBy = 'best_match'; drop('sortBy'); }
-  if (intent.numericExtreme && (!source('numericExtreme') || intent.numericExtreme.field === 'travel' && !intent.travelTargets.some(t => t.id === intent.numericExtreme?.targetId))) { delete intent.numericExtreme; drop('numericExtreme'); }
   // Model-selected weights can add implicit preferences; deterministic score defaults own weights.
   delete intent.weights;
   intent.rawPrompt = prompt;

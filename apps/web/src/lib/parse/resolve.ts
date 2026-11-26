@@ -4,6 +4,7 @@ import { MemoryCache, inputHash, type Cache } from './cache';
 import { normalizePlace } from './place-name';
 import { placeCatalogue, type PlaceEntity } from './place-catalogue';
 import { namedParkMentions } from './named-parks';
+import type { PoiClient } from '../geo/poi-client';
 export { normalizePlace } from './place-name';
 const choice = (p: PlaceEntity) => DestinationChoiceSchema.parse({ id: p.id, label: p.label, resolved: { lng: p.lng, lat: p.lat, source: 'known_place', representativePoint: true, label: p.label } });
 const waterlooRegionBounds = [-80.68, 43.35, -80.32, 43.57] as const;
@@ -20,19 +21,21 @@ function knownResolution(normalized: string, query: string, preferPrimaryCampus:
 export type AddressLookup = (query: string, signal: AbortSignal) => Promise<DestinationResolution | undefined>;
 export class DestinationResolver {
   private cache: Cache<DestinationResolution>;
-  constructor(private config: { addressLookup?: AddressLookup; areaLookup?: AddressLookup; maptilerKey?: string; fetch?: typeof fetch; timeoutMs?: number; preferPrimaryCampus?: boolean; cache?: Cache<DestinationResolution> } = {}) { this.cache = config.cache ?? new MemoryCache<DestinationResolution>(); }
+  constructor(private config: { addressLookup?: AddressLookup; areaLookup?: AddressLookup; poiLookup?: PoiClient['resolve']; maptilerKey?: string; fetch?: typeof fetch; timeoutMs?: number; preferPrimaryCampus?: boolean; cache?: Cache<DestinationResolution> } = {}) { this.cache = config.cache ?? new MemoryCache<DestinationResolution>(); }
   async resolve(input: string, normalizedQuery?: string): Promise<DestinationResolution> {
     const query = z.string().trim().min(1).max(500).parse(input); const normalized = normalizePlace(query);
     const searchQuery = normalizedQuery === undefined ? query : z.string().trim().min(1).max(500).parse(normalizedQuery);
     // A normalization must not narrow an already ambiguous campus or override a known original.
     const prefersPrimary = this.config.preferPrimaryCampus !== false;
     const hint = normalizePlace(searchQuery);
-    const known = knownResolution(normalized, query, prefersPrimary) ?? knownResolution(hint, query, prefersPrimary) ?? knownResolution(normalized, query, prefersPrimary, true) ?? knownResolution(hint, query, prefersPrimary, true);
-    if (known) return known;
+    const fuzzyKnown = () => knownResolution(normalized, query, prefersPrimary, true) ?? knownResolution(hint, query, prefersPrimary, true);
+    const known = knownResolution(normalized, query, prefersPrimary) ?? knownResolution(hint, query, prefersPrimary) ?? (this.config.poiLookup ? undefined : fuzzyKnown());
+    if (known && !this.config.poiLookup) return known;
     const key = inputHash(JSON.stringify([normalized, normalizePlace(searchQuery)])); const cached = this.cache.get(key); if (cached) return { ...cached, query };
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const unavailable = (reason: string): DestinationResolution => ({ status: 'unavailable', query, reason });
     const work = async (): Promise<DestinationResolution> => {
+      if (known) return (await this.config.poiLookup?.(query, controller.signal, prefersPrimary)) ?? known;
       if (this.config.addressLookup) {
         try { const address = await this.config.addressLookup(query, controller.signal); if (address) { const parsed = DestinationResolutionSchema.parse({ ...address, query }); if (parsed.status !== 'unavailable') return parsed; } } catch { /* unavailable owner lookup falls through to geocoding */ }
       }
@@ -40,6 +43,11 @@ export class DestinationResolver {
       // City's neighbourhood table answers them with a labelled representative point.
       if (this.config.areaLookup && !namedParkMentions(query).length) {
         try { const area = await this.config.areaLookup(query, controller.signal); if (area) { const parsed = DestinationResolutionSchema.parse({ ...area, query }); if (parsed.status !== 'unavailable') return parsed; } } catch { /* fall through to geocoding */ }
+      }
+      if (controller.signal.aborted) return unavailable('Destination lookup timed out.');
+      if (this.config.poiLookup) {
+        const poi = await this.config.poiLookup(query, controller.signal, prefersPrimary) ?? fuzzyKnown();
+        if (poi) return poi;
       }
       if (controller.signal.aborted) return unavailable('Destination lookup timed out.');
       if (!this.config.maptilerKey) return unavailable('Address Points unavailable or unmatched; geocoding is not configured. Choose a pin or provide an exact address.');

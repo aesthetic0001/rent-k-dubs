@@ -37,33 +37,49 @@ export const TravelTargetSchema = z.strictObject({
   if (v.schoolLevel && v.category !== 'school') ctx.addIssue({ code: 'custom', message: 'schoolLevel only applies to school' });
   if (v.alternativeModes?.includes(v.mode)) ctx.addIssue({ code: 'custom', message: 'Alternative modes must differ from primary mode' });
 });
-export const NumericExtremeSchema = z.strictObject({
-  field: z.enum(['rent', 'bedrooms', 'bathrooms', 'sizeSqft', 'buildingAge', 'travel']),
-  direction: z.enum(['min', 'max']), percentage: positive.max(100), minimumCount: z.number().int().positive().default(10),
-  targetId: text.optional(),
-}).refine(v => v.field === 'travel' ? !!v.targetId : !v.targetId, 'targetId required only for travel');
 export const WeightsSchema = z.strictObject({ value: nonnegative, price: nonnegative, travel: nonnegative, home: nonnegative, safety: nonnegative }).refine(v => Object.values(v).some(n => n > 0), 'At least one weight must be positive');
-export const SearchIntentSchema = z.strictObject({
+export const SearchCriteriaSchema = z.strictObject({
+  rent: pref(range()).optional(),
+  bedrooms: pref(range(nonnegative.int())).optional(), bathrooms: pref(range()).optional(), sizeSqft: pref(range()).optional(),
+  unitTypes: pref(unique(SearchUnitTypeSchema)).optional(),
+  buildingAge: pref(z.strictObject({ builtAfter: year.optional(), builtBefore: year.optional() }).refine(v => v.builtAfter !== undefined || v.builtBefore !== undefined, 'At least one year required').refine(v => v.builtAfter === undefined || v.builtBefore === undefined || v.builtAfter <= v.builtBefore, 'Years out of order')).optional(),
+  airConditioning: pref(z.enum(['any', 'central'])).optional(), petsAllowed: pref(z.enum(['cats', 'dogs', 'any'])).optional(),
+  furnished: pref(z.boolean()).optional(), parking: pref(z.boolean()).optional(), laundryInSuite: pref(z.boolean()).optional(), utilitiesIncluded: pref(z.boolean()).optional(),
+  availableBy: pref(date).optional(), leaseTerm: pref(z.enum(['short_term', '12_months'])).optional(),
+});
+export const SearchSortSchema = z.enum(['best_match', 'lowest_rent', 'best_value', 'shortest_trips', 'lowest_true_cost', 'newest']);
+export const SearchIntentSchema = z.preprocess(value => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const input = value as Record<string, unknown>;
+  const criteria = input.criteria;
+  const hasRetiredCriterion = criteria && typeof criteria === 'object' && Object.hasOwn(criteria, 'priceFairness');
+  if (!hasRetiredCriterion && !Object.hasOwn(input, 'numericExtreme')) return value;
+  // Older saved searches and share links can carry retired filters.
+  const intent = { ...input };
+  delete intent.numericExtreme;
+  if (hasRetiredCriterion) {
+    intent.criteria = { ...criteria };
+    delete (intent.criteria as Record<string, unknown>).priceFairness;
+  }
+  if (intent.fieldSources && typeof intent.fieldSources === 'object' && !Array.isArray(intent.fieldSources)) {
+    const fieldSources = { ...intent.fieldSources } as Record<string, unknown>;
+    delete fieldSources.numericExtreme;
+    delete fieldSources['criteria.priceFairness'];
+    intent.fieldSources = fieldSources;
+  }
+  return intent;
+}, z.strictObject({
   schemaVersion: z.literal(1), rawPrompt: z.string().max(4000), areas: z.array(AreaFilterSchema),
-  criteria: z.strictObject({
-    rent: pref(range()).optional(), priceFairness: pref(unique(PriceLabelSchema)).optional(),
-    bedrooms: pref(range(nonnegative.int())).optional(), bathrooms: pref(range()).optional(), sizeSqft: pref(range()).optional(),
-    unitTypes: pref(unique(SearchUnitTypeSchema)).optional(),
-    buildingAge: pref(z.strictObject({ builtAfter: year.optional(), builtBefore: year.optional() }).refine(v => v.builtAfter !== undefined || v.builtBefore !== undefined, 'At least one year required').refine(v => v.builtAfter === undefined || v.builtBefore === undefined || v.builtAfter <= v.builtBefore, 'Years out of order')).optional(),
-    airConditioning: pref(z.enum(['any', 'central'])).optional(), petsAllowed: pref(z.enum(['cats', 'dogs', 'any'])).optional(),
-    furnished: pref(z.boolean()).optional(), parking: pref(z.boolean()).optional(), laundryInSuite: pref(z.boolean()).optional(), utilitiesIncluded: pref(z.boolean()).optional(),
-    availableBy: pref(date).optional(), leaseTerm: pref(z.enum(['short_term', '12_months'])).optional(),
-  }),
+  criteria: SearchCriteriaSchema,
   travelTargets: z.array(TravelTargetSchema), safety: z.strictObject({ enabled: z.boolean(), hard: z.boolean(), maxRelativeRate: positive.max(5).optional() }).refine(v => v.enabled || !v.hard, 'Hard safety requires opt-in'),
   household: z.strictObject({ annualIncomeCad: positive.optional(), people: z.number().int().positive().optional() }).optional(),
-  weights: WeightsSchema.optional(), sortBy: z.enum(['best_match', 'lowest_rent', 'best_value', 'shortest_trips', 'lowest_true_cost', 'newest']),
+  weights: WeightsSchema.optional(), sortBy: SearchSortSchema,
   fieldSources: z.record(text, z.strictObject({ source: z.enum(['ai_prompt', 'user', 'default']), phrase: text.optional() })),
-  droppedRequests: z.array(z.strictObject({ phrase: text, reason: text })), numericExtreme: NumericExtremeSchema.optional(),
+  droppedRequests: z.array(z.strictObject({ phrase: text, reason: text })),
 }).superRefine((v, ctx) => {
   if (new Set(v.travelTargets.map(t => t.id)).size !== v.travelTargets.length) ctx.addIssue({ code: 'custom', message: 'Travel target IDs must be unique' });
-  if (v.numericExtreme?.field === 'travel' && !v.travelTargets.some(t => t.id === v.numericExtreme?.targetId)) ctx.addIssue({ code: 'custom', message: 'Unknown percentile travel target' });
   if (!v.safety.enabled && v.weights?.safety) ctx.addIssue({ code: 'custom', message: 'Safety weight requires opt-in' });
-});
+}));
 export const ListingSchema = z.strictObject({
   id: z.uuid(), source: z.enum(['kijiji', 'torontorentals', 'rentals_ca', 'zillow', 'realtor_ca', 'facebook_marketplace', 'manual', 'pasted']), sourceListingId: text, sourceUrl: url,
   title: text, excerpt: z.string().max(280), monthlyRentCad: positive, rentIsPerRoom: z.boolean(), bedrooms: nonnegative.int().nullable(), bathrooms: nonnegative.nullable(),
@@ -91,7 +107,7 @@ export const AdjustmentSchema = z.strictObject({
 });
 export const ValuationSchema = z.strictObject({
   status: z.enum(['ok', 'insufficient_data']), estimatedRentCad: positive.optional(), lowCad: positive.optional(), highCad: positive.optional(), differenceCad: z.number().finite().optional(), differencePct: z.number().finite().optional(),
-  priceLabel: z.enum(['underpriced', 'reasonable', 'overpriced', 'unknown']),
+  priceLabel: z.enum([...PriceLabelSchema.options, 'unknown']),
   // Candidates the engine considered. `comparables` may be a subset (empty when data is insufficient).
   comparableCount: nonnegative.int(),
   // Candidates after the same-building cap (SPEC 7.2): this is the count behind the five-comparable
@@ -134,7 +150,7 @@ export const DestinationResolutionSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('unavailable'), query: text, reason: text }),
 ]);
 export const ParseRequestSchema = z.strictObject({ prompt: text.max(4000) });
-export const ParseResponseSchema = z.strictObject({ intent: SearchIntentSchema, destinations: z.array(z.strictObject({ targetId: text, resolution: DestinationResolutionSchema })), parser: z.enum(['gemini', 'fallback']), notice: text.optional() });
+export const ParseResponseSchema = z.strictObject({ intent: SearchIntentSchema, destinations: z.array(z.strictObject({ targetId: text, resolution: DestinationResolutionSchema })), parser: z.enum(['gemini', 'gliner', 'fallback']), notice: text.optional() });
 export const SearchRequestSchema = z.strictObject({ intent: SearchIntentSchema, hideUnconfirmed: z.boolean().default(false) });
 export const SearchResultSchema = z.strictObject({ listing: ListingSchema, valuation: ValuationSchema, travel: z.array(TravelTimeRowSchema), safety: SafetySchema.nullable(), matchScore: MatchScoreSchema }).refine(v => v.travel.every(t => t.listingId === v.listing.id), 'Travel rows must match listing').refine(v => v.valuation.status !== 'ok' || Math.abs(v.valuation.estimatedRentCad! - v.listing.monthlyRentCad - v.valuation.differenceCad!) < .01, 'Valuation difference must match listing rent').refine(v => !v.safety || v.safety.areaId === v.listing.neighbourhoodId, 'Safety must match listing neighbourhood');
 export const SearchResponseSchema = z.discriminatedUnion('status', [
@@ -163,7 +179,6 @@ export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 export type DetailResponse = z.infer<typeof DetailResponseSchema>;
 export type DestinationResolution = z.infer<typeof DestinationResolutionSchema>;
 export type AreaFilter = z.infer<typeof AreaFilterSchema>;
-export type NumericExtreme = z.infer<typeof NumericExtremeSchema>;
 export type ParseRequest = z.infer<typeof ParseRequestSchema>;
 export type ParseResponse = z.infer<typeof ParseResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;

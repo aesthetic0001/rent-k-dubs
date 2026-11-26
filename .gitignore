@@ -31,6 +31,7 @@ otp/graphs/
 *.log
 # scratch merge artifacts
 .tmp-merge/
+/local/
 
 # use pnpm
 package-lock.json

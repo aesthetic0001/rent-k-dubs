@@ -1,9 +1,9 @@
 # Waterloo rental search benchmarks
 
 Runs on November 25, 2026 used an NVIDIA GeForce RTX 3080, the local search
-worktree, and the local POI service backed by the Waterloo database. The latest
-checkpoint, V14, builds on GLiNER2.5 with rental-specific span labels. These
-results measure prompt interpretation in the experimental pipeline described in
+worktree, and the local POI service backed by the Waterloo database. The evaluated
+checkpoint, V14, builds on GLiNER2.5 with rental-specific span labels. Results
+measure prompt interpretation in the optional local pipeline described in
 [Search and places](architecture/Search%20and%20places.md).
 
 ## Full-query accuracy and parse latency

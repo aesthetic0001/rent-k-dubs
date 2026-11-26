@@ -211,7 +211,7 @@ export default async function DataPage() {
         <p>{d("score.intro")}</p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            {d("score.parts.value", { weight: w.value, fairness: engineConfig.fairnessWeight })}
+            {d("score.parts.value", { weight: w.value })}
           </li>
           <li>{d("score.parts.price", { weight: w.price })}</li>
           <li>{d("score.parts.travel", { weight: w.travel })}</li>

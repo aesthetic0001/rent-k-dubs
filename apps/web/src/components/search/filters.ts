@@ -28,7 +28,7 @@ function editedSources(intent: SearchIntent, key: string): SearchIntent["fieldSo
 }
 
 /**
- * Sets one criterion's value (undefined removes it). A new criterion starts as a preference;
+ * Sets one criterion's value (undefined removes it). A new criterion starts as a must-have;
  * an existing one keeps its must-have state. Unchanged values leave the intent as it is.
  */
 export function setCriterion<K extends CriterionField>(
@@ -49,7 +49,7 @@ export function setCriterion<K extends CriterionField>(
   if (current && JSON.stringify(current.value) === JSON.stringify(value)) return intent;
   return {
     ...intent,
-    criteria: { ...intent.criteria, [field]: { value, hard: current?.hard ?? false } } as Criteria,
+    criteria: { ...intent.criteria, [field]: { value, hard: current?.hard ?? true } } as Criteria,
     fieldSources: editedSources(intent, key),
   };
 }
@@ -106,7 +106,7 @@ export function addPlaceTarget(
         query: place.query,
         resolved: place.resolved,
         mode: "transit",
-        hard: false,
+        hard: true,
       },
     ],
     fieldSources: { ...intent.fieldSources, [`travelTargets.${id}`]: { source: "user" } },
@@ -131,7 +131,7 @@ export function addAmenityTarget(
         category,
         ...(category === "school" ? { schoolLevel: "any" as const } : {}),
         mode: "walk",
-        hard: false,
+        hard: true,
       },
     ],
     fieldSources: { ...intent.fieldSources, [`travelTargets.${id}`]: { source: "user" } },

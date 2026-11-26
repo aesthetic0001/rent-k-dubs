@@ -7,7 +7,6 @@ import type { ScoreContext } from '../../../../../packages/shared/engine/score';
 import { createRouteTimes } from '../geo/route-times';
 import { candidateColumns, listingFromRow } from './candidates-sql';
 import { routeCandidateContexts, searchCandidates, type SearchDependencies } from './candidates';
-import { searchPercentileCandidates } from './candidates-percentiles';
 
 const context = (): ScoreContext => ({ valuation: valuations[3], safety: null, travel: [] });
 test('ordinary routing retains a completed mode when another hangs and ignores its late response', async () => {
@@ -31,7 +30,7 @@ test('ordinary routing retains a completed mode when another hangs and ignores i
 
 // Opt in: RUN_LIVE_PARTIAL_ROUTING=1 pnpm --filter web exec vitest run src/lib/db/candidates-routing.test.ts
 // Actual read-only listings + published D adapter, controlled routing answers; this is not live OTP acceptance.
-test.skipIf(process.env.RUN_LIVE_PARTIAL_ROUTING !== '1')('real listings retain partial D routes, OR modes/AND destinations and honest exact-percentile unavailability', async () => {
+test.skipIf(process.env.RUN_LIVE_PARTIAL_ROUTING !== '1')('real listings retain partial D routes, OR modes/AND destinations', async () => {
   if (!process.env.DATABASE_URL) process.loadEnvFile('.env.local');
   assert.ok(process.env.DATABASE_URL, 'DATABASE_URL required');
   const sql = postgres(process.env.DATABASE_URL, { max: 1, connect_timeout: 5, onnotice: () => {} });
@@ -73,9 +72,6 @@ test.skipIf(process.env.RUN_LIVE_PARTIAL_ROUTING !== '1')('real listings retain 
         assert.ok(unknown.travel.every(row => row.method === 'straight_line' && row.minutes === null));
       }
     }
-    const exact = await searchPercentileCandidates({ intent: { ...intent, numericExtreme: { field: 'travel', targetId: campus.id, direction: 'min', percentage: 5, minimumCount: 1 } }, hideUnconfirmed: false }, makeDependencies(), { deadline: Date.now() + 700, referenceYear: 2026 });
-    assert.equal(exact.status, 'unavailable');
-    assert.ok(!('results' in exact), 'partial route coverage must never become an exact percentile');
     process.stdout.write(JSON.stringify({ database: 'live read-only', listings: listings.length, router: 'controlled via published D adapter', partialOrdinary: 'passed', exactPartial: 'unavailable' }) + '\n');
   } finally { await sql.end({ timeout: 2 }); }
 }, 15000);

@@ -101,6 +101,10 @@ for (const { geometry, properties } of codedBuildings) {
   const { ObjectId, buildingName, alternateBuildingNames } = properties;
   const code = properties.buildingCode!.trim();
   const key = code.toLowerCase();
+  const olderCodes = (commonAliases[code] ?? []).filter(alias => /^[A-Z]+\d+$/.test(alias));
+  const qualifiedCodes = [code, ...olderCodes].flatMap(buildingCode =>
+    ["University of Waterloo's", "UW's"].flatMap(campus =>
+      [`${campus} ${buildingCode}`, `${campus} ${buildingCode} building`]));
   const label = buildingName.trim().replace(/ \[formerly .+\]$/, "");
   if (!label || geometry?.type !== "Point" || !Array.isArray(geometry.coordinates)) {
     throw new Error(`Missing label or point for UW building ${code}`);
@@ -117,6 +121,7 @@ for (const { geometry, properties } of codedBuildings) {
         `UW ${code}`,
         alternateBuildingNames?.trim() || label,
         ...(commonAliases[code] ?? []),
+        ...qualifiedCodes,
       ]),
     ],
     lng: round(lng),

@@ -24,9 +24,9 @@ const valid = (next: SearchIntent) => SearchIntentSchema.parse(next);
 const unionStation = { lng: -79.3806, lat: 43.6453, source: "known_place" as const };
 
 describe("criteria", () => {
-  it("adds a new criterion as a preference, marked as set by the renter", () => {
+  it("adds a new criterion as a must-have, marked as set by the renter", () => {
     const next = valid(setCriterion(intent, "parking", true));
-    expect(next.criteria.parking).toEqual({ value: true, hard: false });
+    expect(next.criteria.parking).toEqual({ value: true, hard: true });
     expect(next.fieldSources["criteria.parking"]).toEqual({ source: "user" });
   });
 
@@ -70,7 +70,7 @@ describe("inputs", () => {
 });
 
 describe("travel targets", () => {
-  it("adds a resolved place reached by transit, as a preference", () => {
+  it("adds a required place reached by transit", () => {
     const next = valid(
       addPlaceTarget(intent, { query: "Union", label: "Union Station", resolved: unionStation }),
     );
@@ -79,7 +79,7 @@ describe("travel targets", () => {
       kind: "place",
       label: "Union Station",
       mode: "transit",
-      hard: false,
+      hard: true,
     });
   });
 
@@ -92,6 +92,7 @@ describe("travel targets", () => {
       category: "school",
       schoolLevel: "any",
       mode: "walk",
+      hard: true,
     });
   });
 

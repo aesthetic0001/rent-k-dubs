@@ -7,7 +7,6 @@ import { getClient } from '../db';
 import { clearValuationCache } from './valuation';
 import { sqlSearchDependencies } from './candidates-context';
 import { crimeTableFromRows } from './safety';
-import { searchPercentileCandidates } from './candidates-percentiles';
 import { SearchUnavailable } from './candidates';
 import { createRuntime } from '../api/runtime';
 vi.mock('../db', () => ({ getClient: vi.fn(() => null) }));
@@ -43,8 +42,7 @@ afterEach(() => { vi.restoreAllMocks(); clearValuationCache(); vi.mocked(getClie
 test('default SQL runtime consumes actual C context, cached valuation and stored caveats with nullable civic IDs', async () => {
   const db = client(); vi.mocked(getClient).mockReturnValue(db.sql);
   const api = createRuntime({ env: { DATABASE_URL: 'configured' } });
-  const request = { ...input, intent: { ...baseIntent, criteria: { priceFairness: { hard: true, value: ['underpriced' as const] } } } };
-  const response = await api.search(http(request), undefined);
+  const response = await api.search(http(input), undefined);
   assert.equal(response.status, 200);
   const result = (await response.json()).results[0];
   assert.equal(result.listing.neighbourhoodId, null); assert.equal(result.listing.dataStatus, 'live');
@@ -52,8 +50,6 @@ test('default SQL runtime consumes actual C context, cached valuation and stored
   assert.ok(result.matchScore.caveats.some((c: { code: string }) => c.code === 'deposit_before_viewing'));
   assert.ok(result.matchScore.caveats.some((c: { code: string }) => c.code === 'price_dropped'));
   assert.equal(result.safety, null);
-  const rejected = await api.search(http({ ...request, intent: { ...request.intent, criteria: { priceFairness: { hard: true, value: ['overpriced'] } } } }), undefined);
-  assert.equal((await rejected.json()).results.length, 0);
   // One comparable-pool read serves every candidate instead of one per listing.
   assert.equal(db.unsafe.mock.calls.filter(([s]) => s.includes('FROM listings c')).length, 1);
   assert.equal(result.valuation.comparables.length, 3);
@@ -91,28 +87,7 @@ test('missing routing/safety remain unknown; distance decides the hard travel ga
   // The same intent against a listing 2.7 km away is a hard travel failure, which hiding removes.
   const far = client(); const farApi = createRuntime({ dependencies: sqlSearchDependencies(() => far.sql), env: {} });
   const farHidden = await farApi.search(http({ intent, hideUnconfirmed: true }), undefined); assert.equal((await farHidden.json()).results.length, 0);
-  // A travel percentile needs no router: distance ranks the pool, so the answer is complete.
-  const exact = await searchPercentileCandidates({ ...input, intent: { ...travelIntent, numericExtreme: { field: 'travel', direction: 'min', percentage: 5, minimumCount: 10, targetId: travelIntent.travelTargets[0].id } } }, dependencies, { referenceYear: 2026 });
-  assert.equal(exact.status, 'completed'); if (exact.status === 'completed') assert.equal(exact.results.length, 1);
 });
-test('exact deadline aborts enrichment while another runtime can still serve static context', async () => {
-  let finish: (rows: unknown[]) => void = () => {};
-  let queries = 0;
-  const db = client({ query: () => { queries++; return queries === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve([]); } });
-  const dependencies = sqlSearchDependencies(() => db.sql);
-  const exact: SearchRequest = { ...input, intent: { ...travelIntent, numericExtreme: { field: 'travel', direction: 'min', percentage: 5, minimumCount: 10, targetId: travelIntent.travelTargets[0].id } } };
-  dependencies.routeTimes = async () => [];
-  const result = await searchPercentileCandidates(exact, dependencies, { referenceYear: 2026, deadline: Date.now() + 25 });
-  assert.equal(result.status, 'unavailable'); if (result.status === 'unavailable') assert.equal(result.reason, 'timeout');
-  assert.equal(queries, 1);
-  const retry = sqlSearchDependencies(() => db.sql);
-  const concurrent = await retry.enrich({ ...listing, id: sampleListings[2].id }, baseIntent); assert.equal(concurrent.valuation.status, 'insufficient_data'); assert.equal(queries, 3);
-  finish(five());
-  await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(queries, 4);
-  const context = await retry.enrich(listing, baseIntent); assert.equal(context.valuation.status, 'ok'); assert.equal(queries, 5);
-});
-
 test('unfinished owner enrichments are bounded and release capacity when settled', async () => {
   let finish: (rows: unknown[]) => void = () => {};
   const rows = new Promise<unknown[]>(resolve => { finish = resolve; });

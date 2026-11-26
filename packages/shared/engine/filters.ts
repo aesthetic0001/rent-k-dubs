@@ -21,8 +21,6 @@ export function filterListing(listing: Listing, intent: SearchIntent, context: F
   if (rent?.hard) check('rent', listing.monthlyRentCad >= (rent.value.min ?? 0) && listing.monthlyRentCad <= (rent.value.max ?? Infinity));
   for (const criterion of homeCriteria(listing, intent)) if (criterion.hard) check(criterion.name, criterion.matches);
   if (!cheapOnly) {
-    const fairness = intent.criteria.priceFairness;
-    if (fairness?.hard) check('priceFairness', !context.valuation || context.valuation.priceLabel === 'unknown' ? null : fairness.value.includes(context.valuation.priceLabel));
     // The renter's limit from the safety slider, else D's default (the city rate).
     if (intent.safety.enabled && intent.safety.hard) check('safety', context.safety?.relativeRate == null ? null : context.safety.relativeRate <= (intent.safety.maxRelativeRate ?? SAFETY.hardMaxRelativeRate));
     for (const target of intent.travelTargets) if (target.hard) {

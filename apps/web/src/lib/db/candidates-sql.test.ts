@@ -1,6 +1,6 @@
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
-import { baseIntent, sampleListings, valuations, travelIntent } from '../../../../../packages/shared/fixtures/index';
+import { baseIntent, sampleListings, valuations } from '../../../../../packages/shared/fixtures/index';
 import type { Listing, SearchRequest } from '../../../../../packages/shared/schemas/index';
 import { candidateQuery, listingFromRow, sqlCandidateLoader, sqlListingLoader } from './candidates-sql';
 import { SearchUnavailable } from './candidates';
@@ -45,15 +45,13 @@ test('SQL areas use OR and conservative near gating; pure verification handles e
   assert.equal((await load(area)).length, 2); assert.equal((await load({ ...area, hideUnconfirmed: true })).length, 1);
   const query = candidateQuery(area); assert.match(query.statement, / OR \(ST_X/); assert.deepEqual(query.parameters, ['not-a-match', -80.1, -79.9, 43.9, 44.1]);
 });
-test('loader reaches ordinary and scalar APIs, preserving full >500 pool before numeric ordering/percentile', async () => {
+test('loader preserves the full pool before rent ordering and result cap', async () => {
   const rows = Array.from({ length: 520 }, (_, i) => rowFor({ ...sampleListings[0], id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, monthlyRentCad: 1520 - i }));
   let calls = 0;
   const loadCandidates = sqlCandidateLoader(() => ({ unsafe: async (statement) => { calls++; assert.doesNotMatch(statement, /LIMIT/i); return rows; } }));
   const api = createRuntime({ env: {}, dependencies: { listings: [], loadCandidates, enrich } });
   const ordinary = await api.search(http({ ...input, intent: { ...baseIntent, sortBy: 'lowest_rent' } }), undefined);
-  const result = await ordinary.json(); assert.equal(ordinary.status, 200); assert.equal(result.results.length, 500); assert.equal(result.eligibleCount, 520); assert.equal(result.results[0].listing.monthlyRentCad, 1001);
-  const scalar = await api.search(http({ ...input, intent: { ...baseIntent, numericExtreme: { field: 'rent', direction: 'min', percentage: 100, minimumCount: 10 } } }), undefined);
-  const selected = await scalar.json(); assert.equal(scalar.status, 200); assert.equal(selected.results.length, 520); assert.equal(selected.eligibleCount, 520); assert.equal(calls, 2);
+  const result = await ordinary.json(); assert.equal(ordinary.status, 200); assert.equal(result.results.length, 500); assert.equal(result.eligibleCount, 520); assert.equal(result.results[0].listing.monthlyRentCad, 1001); assert.equal(calls, 1);
 });
 test('loader pure verification applies every cheap gate before enrichment even with simulated unfiltered DB', async () => {
   const first = { ...sampleListings[0], bedrooms: 2 as number | null };
@@ -63,7 +61,7 @@ test('loader pure verification applies every cheap gate before enrichment even w
   const body = { ...input, intent: { ...baseIntent, criteria: { bedrooms: { hard: true, value: { min: 2 } } } }, hideUnconfirmed: true };
   const response = await api.search(http(body), undefined); assert.equal(response.status, 200); assert.equal((await response.json()).results.length, 1); assert.equal(enriched, 1);
 });
-test('missing DB, invalid rows, aborted reads and exact job cancellation fail honestly', async () => {
+test('missing DB, invalid rows and aborted reads fail honestly', async () => {
   vi.mocked(getClient).mockClear(); await assert.rejects(sqlCandidateLoader()(input), SearchUnavailable); assert.equal(vi.mocked(getClient).mock.calls.length, 1);
   await assert.rejects(sqlCandidateLoader(() => ({ unsafe: async () => [{}] }))(input), SearchUnavailable);
   for (const unsafe of [async () => [{}], async () => { throw new Error('private database details'); }]) {
@@ -77,9 +75,6 @@ test('missing DB, invalid rows, aborted reads and exact job cancellation fail ho
   assert.deepEqual(await retry(input), []); assert.equal(retried, 1);
   finish([]); await new Promise(resolve => setTimeout(resolve, 0));
   assert.deepEqual(await retry(input), []); assert.equal(retried, 2);
-  const api = createRuntime({ env: {}, dependencies: { listings: [], loadCandidates: load, enrich } });
-  const response = await api.search(http({ ...input, intent: { ...travelIntent, numericExtreme: { field: 'travel', direction: 'min', percentage: 5, minimumCount: 10, targetId: travelIntent.travelTargets[0].id } } }), undefined);
-  assert.equal(response.status, 200); assert.equal((await response.json()).status, 'pending'); api.jobs.dispose(); finish([]);
 });
 
 test('SQL detail binds UUID lookup, distinguishes absence and sanitizes failed reads', async () => {

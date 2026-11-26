@@ -7,6 +7,8 @@ import { caveats } from '../../../../../packages/shared/engine/caveats';
 import { scoreListing } from '../../../../../packages/shared/engine/score';
 import { distanceM, targetModes } from '../../../../../packages/shared/engine/travel';
 import { ParseService, DestinationResolver, IpLimiter } from '../parse/index';
+import { searchExtractor } from '../parse/local-extractor';
+import { poiClient } from '../geo/poi-client';
 import { withoutNeighbourhoodSafety } from '../parse/market-safety';
 import { inputHash } from '../parse/cache';
 import { databaseIntentCache } from '../parse/db-cache';
@@ -21,7 +23,6 @@ import { areaPointsLookup } from '../parse/areas';
 import { amenityDistances } from '../db/pois';
 import { searchCandidates, fillDistanceRows, fillAmenityDistances, routeCandidateContexts, SearchUnavailable, type SearchDependencies } from '../db/candidates';
 import { sqlSearchDependencies } from '../db/candidates-context';
-import { searchPercentileCandidates } from '../db/candidates-percentiles';
 import { SearchJobs } from './jobs';
 import { ApiError, jsonRoute } from './json-route';
 export const fixtureDependencies: SearchDependencies = {
@@ -36,10 +37,11 @@ export const fixtureDependencies: SearchDependencies = {
     return { valuation, travel: [], safety: intent.safety.enabled && safety && listing.neighbourhoodId !== null ? { ...safety, areaId: listing.neighbourhoodId } : null, safetyScore: 80, caveats: listingCaveats };
   },
 };
-type RuntimeOptions = { env?: Record<string, string | undefined>; parser?: ParseService; resolver?: DestinationResolver; dependencies?: SearchDependencies; jobs?: SearchJobs; identity?: (request: Request) => string; limiter?: IpLimiter; startLimiter?: IpLimiter; pollLimiter?: IpLimiter; explainProvider?: import('../ai/index').AIProvider };
+type RuntimeOptions = { env?: Record<string, string | undefined>; parser?: ParseService; resolver?: DestinationResolver; dependencies?: SearchDependencies; jobs?: SearchJobs; identity?: (request: Request) => string; limiter?: IpLimiter; pollLimiter?: IpLimiter; explainProvider?: import('../ai/index').AIProvider };
 export function createRuntime(options: RuntimeOptions = {}) {
   const env = options.env ?? process.env;
   const safetyAvailable = env.SEARCH_FIXTURES === '1' || options.dependencies !== undefined;
+  const poi = poiClient(env.POI_SERVICE_URL);
   const marketIntent = (intent: z.infer<typeof SearchIntentSchema>) =>
     safetyAvailable ? intent : withoutNeighbourhoodSafety(intent);
   const resolver = options.resolver ?? new DestinationResolver({
@@ -47,8 +49,15 @@ export function createRuntime(options: RuntimeOptions = {}) {
     addressLookup: env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL ? addressPointsLookup() : undefined,
     // Neighbourhood names ("Uptown", "Beechwood") before geocoding.
     areaLookup: env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL ? areaPointsLookup() : undefined,
+    poiLookup: poi?.resolve,
   });
-  const parser = options.parser ?? new ParseService({ provider: providerFromEnv(env), resolver, civicAreas: env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL ? civicAreasLookup() : undefined, cacheNamespace: `${env.AI_PROVIDER}:${env.GEMINI_MODEL_FAST ?? env.GEMINI_MODEL}`, intentCache: env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL && env.AI_PROVIDER === 'gemini' ? databaseIntentCache() : undefined });
+  const parser = options.parser ?? new ParseService({
+    provider: providerFromEnv(env), extractor: searchExtractor(env.SEARCH_EXTRACTOR_URL, Number(env.SEARCH_EXTRACTOR_TIMEOUT_MS ?? 2500)), resolver,
+    civicAreas: env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL ? civicAreasLookup() : undefined,
+    poiMentions: poi?.mentions,
+    cacheNamespace: env.SEARCH_EXTRACTOR_URL ? `gliner:${env.SEARCH_EXTRACTOR_URL}` : `${env.AI_PROVIDER}:${env.GEMINI_MODEL_FAST ?? env.GEMINI_MODEL}`,
+    intentCache: !poi && !env.SEARCH_EXTRACTOR_URL && env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL && env.AI_PROVIDER === 'gemini' ? databaseIntentCache() : undefined,
+  });
   const explainer = new ExplanationService(options.explainProvider ?? providerFromEnv(env), `${env.AI_PROVIDER}:${env.GEMINI_MODEL_FAST ?? env.GEMINI_MODEL}`, env.SEARCH_FIXTURES !== '1' && env.DATABASE_URL && env.AI_PROVIDER === 'gemini' ? databaseExplanationCache() : undefined);
   const jobs = options.jobs ?? new SearchJobs();
   // Identical searches (a reload, Back from a listing, React running an effect twice) answer from
@@ -63,7 +72,7 @@ export function createRuntime(options: RuntimeOptions = {}) {
     const ip = env.VERCEL === '1' ? request.headers.get('x-vercel-forwarded-for') : null;
     return ip && isIP(ip) ? ip : 'anonymous';
   });
-  const limiter = options.limiter ?? new IpLimiter(60), startLimiter = options.startLimiter ?? new IpLimiter(10), pollLimiter = options.pollLimiter ?? new IpLimiter(120);
+  const limiter = options.limiter ?? new IpLimiter(60), pollLimiter = options.pollLimiter ?? new IpLimiter(120);
   const limit = (request: Request) => limiter.check(identity(request));
   const requireDependencies = () => { if (!dependencies) throw new ApiError(503, 'service_unavailable', 'Search temporarily unavailable'); return dependencies; };
   const params = z.strictObject({ id: z.uuid() });
@@ -111,18 +120,14 @@ export function createRuntime(options: RuntimeOptions = {}) {
       return { ...parsed, intent, ...(notice ? { notice } : {}) };
     }),
     resolve: jsonRoute({ name: 'geo.resolve', rateLimit: limit }, async (_input, request) => resolver.resolve(z.string().trim().min(1).max(500).parse(query(request, 'q')))),
-    search: jsonRoute({ name: 'listings.search', body: SearchRequestSchema, rateLimit: limit }, async (request, raw) => {
+    search: jsonRoute({ name: 'listings.search', body: SearchRequestSchema, rateLimit: limit }, async (request) => {
       request = { ...request, intent: marketIntent(request.intent) };
       const deps = requireDependencies();
-      if (request.intent.numericExtreme?.field === 'travel') {
-        startLimiter.check(identity(raw));
-        return jobs.start((signal, deadline) => searchPercentileCandidates(request, deps, { referenceYear: new Date().getUTCFullYear(), deadline, signal }));
-      }
       const cacheKey = inputHash(JSON.stringify([request.intent, request.hideUnconfirmed]));
       const hit = searchCache.get(cacheKey);
       if (hit && hit.expires > Date.now()) return hit.value;
       try {
-        const response = request.intent.numericExtreme ? await searchPercentileCandidates(request, deps, { referenceYear: new Date().getUTCFullYear() }) : SearchResponseSchema.parse({ status: 'completed', ...await searchCandidates(request, deps) });
+        const response = SearchResponseSchema.parse({ status: 'completed', ...await searchCandidates(request, deps) });
         if (searchCache.size >= SEARCH_CACHE_SIZE) searchCache.delete(searchCache.keys().next().value!);
         searchCache.set(cacheKey, { expires: Date.now() + SEARCH_CACHE_TTL_MS, value: response });
         return response;
@@ -158,10 +163,10 @@ export function createRuntime(options: RuntimeOptions = {}) {
   };
 }
 type Runtime = ReturnType<typeof createRuntime>;
-type SharedState = Required<Pick<RuntimeOptions, 'jobs' | 'limiter' | 'startLimiter' | 'pollLimiter'>>;
+type SharedState = Required<Pick<RuntimeOptions, 'jobs' | 'limiter' | 'pollLimiter'>>;
 const globalState = globalThis as typeof globalThis & { __rentSearchState?: SharedState };
 let runtime: Runtime | undefined;
 // Keep jobs and quotas across route bundles/reloads, but let code reloads replace handler closures.
 export const getRuntime = (): Runtime => runtime ??= createRuntime(globalState.__rentSearchState ??= {
-  jobs: new SearchJobs(), limiter: new IpLimiter(60), startLimiter: new IpLimiter(10), pollLimiter: new IpLimiter(120),
+  jobs: new SearchJobs(), limiter: new IpLimiter(60), pollLimiter: new IpLimiter(120),
 });

@@ -44,6 +44,18 @@ services:
       # `docker compose down -v` still deletes it — that is the only command that should.
       - worker-cache:/app/apps/worker/.cache
 
+  poi:
+    profiles: ["poi"]
+    build:
+      context: .
+      dockerfile: apps/poi/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8082"
+    volumes:
+      - poi-models:/models
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -69,6 +81,7 @@ services:
   # search ranking still uses distance estimates.
 
 volumes:
+  poi-models:
   caddy_data:
   caddy_config:
   worker-cache:

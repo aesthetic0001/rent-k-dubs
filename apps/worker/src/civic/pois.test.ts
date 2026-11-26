@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { overpassQuery, poiRow, poiRows, schoolLevel, WATERLOO_BBOX } from "./pois.ts";
+import { fillPoiMetadata, mergePoiMatches } from "./poi-metadata.ts";
 
 const node = (id: number, tags: Record<string, string>) => ({
   type: "node" as const,
@@ -10,6 +11,19 @@ const node = (id: number, tags: Record<string, string>) => ({
 });
 
 describe("poiRow", () => {
+  it("keeps OSM address fields and distinct aliases", () => {
+    const tags = { name: "Sobeys", shop: "supermarket" };
+    expect(poiRow(node(1, {
+      ...tags, "addr:street": " Bridgeport Road East ", "addr:housenumber": "94",
+      "addr:city": "Waterloo", "alt_name": "Sobeys;Bridgeport Sobeys", "brand": "Sobeys",
+    }))).toMatchObject({
+      street_name: "Bridgeport Road East", house_number: "94", city: "Waterloo",
+      aliases: ["Bridgeport Sobeys"],
+    });
+    expect(poiRow(node(1, tags))?.street_name).toBeNull();
+    expect(poiRow(node(1, { ...tags, "addr:street": " " }))?.street_name).toBeNull();
+  });
+
   it("files each OSM tag under its category", () => {
     const category = (tags: Record<string, string>) =>
       poiRow(node(1, { name: "X", ...tags }))?.category;
@@ -39,6 +53,34 @@ describe("poiRow", () => {
     });
     expect(poiRow(node(2, { shop: "supermarket" }))).toBeNull();
     expect(poiRow({ type: "way", id: 3, tags: { name: "No centre", leisure: "park" } })).toBeNull();
+  });
+});
+
+describe("supplemental POI metadata", () => {
+  const snapshot = [{
+    id: "osm:node/1", name: "Wintermeyer Park", lat: 43.47, lng: -80.54,
+    street: "Forestlawn Road", house_number: "497", city: "Waterloo",
+  }];
+
+  it("fills absent fields and keeps a verified address during a source outage", () => {
+    const row = poiRow(node(1, { name: "Wintermeyer Park", leisure: "park" }))!;
+    mergePoiMatches([row], [], snapshot);
+    expect(row).toMatchObject({ street_name: "Forestlawn Road", house_number: "497", city: "Waterloo" });
+    const refreshed = poiRow(node(1, { name: row.name, leisure: "park", "addr:street": "Forestlawn Rd" }))!;
+    fillPoiMetadata(refreshed, row);
+    expect(refreshed).toMatchObject({ street_name: "Forestlawn Rd", house_number: "497", city: "Waterloo" });
+  });
+
+  it("keeps an explicit OSM street and withholds disputed or relocated addresses", () => {
+    const row = poiRow(node(1, { name: "Wintermeyer Park", leisure: "park", "addr:street": "Other Road" }))!;
+    mergePoiMatches([row], [
+      { id: row.id, priority: 1, street_name: "Forestlawn Rd", house_number: "497" },
+      { id: row.id, priority: 1, street_name: "Forestlawn Rd", house_number: "499" },
+    ], snapshot);
+    expect(row).toMatchObject({ street_name: "Other Road", house_number: null, city: "Waterloo" });
+    const moved = { ...row, location: "SRID=4326;POINT(-80.53 43.47)", city: null };
+    mergePoiMatches([moved], [], snapshot);
+    expect(moved.city).toBeNull();
   });
 });
 
