@@ -18,8 +18,8 @@ results measure prompt interpretation in the experimental pipeline described in
 A full-query match requires all scored criteria, areas, destinations, travel
 limits, specified modes, requirement strengths, and sort order to match the
 expected intent. Extra criteria and destinations count as errors. The API
-harness measured sequential wall time in the running parse handler, including
-model calls and destination lookup. Every run in the table completed without
+harness called the parse handler in process and measured sequential wall time,
+including model calls and destination lookup. Every run in the table completed without
 fallback or parse errors. Time to first listing results and routing accuracy
 were outside the measurement.
 
