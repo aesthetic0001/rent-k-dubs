@@ -23,7 +23,7 @@ test('all six acceptance prompts parse and do not infer unstated criteria', asyn
   const two = fallbackParse(local[1]); assert.deepEqual(new Set([two.travelTargets[0].mode, ...two.travelTargets[0].alternativeModes!]), new Set(['transit','bike','walk'])); assert.deepEqual(two.criteria, {}); assert.equal(two.household, undefined);
   const three = fallbackParse(local[2], undefined, areas); assert.equal(three.sortBy, 'lowest_rent'); assert.equal(three.areas[0].kind, 'neighbourhood');
   const student = fallbackParse(demos[0]); assert.deepEqual(student.criteria.unitTypes?.value, ['room', 'studio']); assert.equal(student.criteria.bedrooms, undefined); assert.equal(student.criteria.furnished?.value, true);
-  const couple = fallbackParse(demos[1]); assert.deepEqual(couple.criteria.bedrooms?.value, { min: 2, max: 2 }); assert.equal(couple.criteria.rent?.value.max, 2800); assert.equal(couple.household?.annualIncomeCad, 95000); assert.equal(couple.travelTargets.length, 2); assert.equal(couple.travelTargets[0].maxMinutes, 25); assert.equal(couple.travelTargets[1].maxMinutes, undefined); assert.equal(couple.criteria.priceFairness?.hard, false);
+  const couple = fallbackParse(demos[1]); assert.deepEqual(couple.criteria.bedrooms?.value, { min: 2, max: 2 }); assert.equal(couple.criteria.rent?.value.max, 2800); assert.equal(couple.household?.annualIncomeCad, 95000); assert.equal(couple.travelTargets.length, 2); assert.equal(couple.travelTargets[0].maxMinutes, 25); assert.equal(couple.travelTargets[1].maxMinutes, undefined); assert.equal(Object.hasOwn(couple.criteria, 'priceFairness'), false);
   const family = fallbackParse(demos[2], undefined, areas); assert.equal(family.travelTargets.length, 2); assert.equal(family.areas[0].kind, 'neighbourhood');
   const service = new ParseService({ provider: new NoneProvider() });
   for (const prompt of [...local, ...demos]) { const response = await service.parse({ prompt }, 'trusted-ip'); assert.equal(response.parser, 'fallback'); }
@@ -35,15 +35,10 @@ test('home bounds, preferences, booleans, age, source evidence and safety remain
   assert.equal(fallbackParse('new build below city crime rate', new Date('2026-01-01')).criteria.buildingAge?.value.builtAfter, 2016);
   assert.equal(fallbackParse('new build below city crime rate').safety.hard, true);
 });
-test('percentiles, minima, travel selectors, independent destinations and clarification', () => {
-  assert.deepEqual(fallbackParse('bottom 5% rent min 12 results').numericExtreme, { field:'rent', direction:'min', percentage:5, minimumCount:12 });
+test('retired cutoffs do not become rent limits, and independent destinations retain their bounds', () => {
   for (const prompt of ['bottom 5% rent minimum 100 results', 'bottom 5% rent min 10 results', 'rent under 5%']) {
     assert.equal(fallbackParse(prompt).criteria.rent, undefined, prompt);
   }
-  assert.equal(fallbackParse('bottom 5% rent minimum 100 results').numericExtreme?.minimumCount, 100);
-  assert.equal(fallbackParse('top 5% largest').numericExtreme?.field, 'sizeSqft');
-  assert.equal(fallbackParse('top 5% shortest travel to Kitchener GO Station by bike').numericExtreme?.targetId, 'target-1');
-  const multiple = fallbackParse('bottom 5% rent and top 10% size'); assert.equal(multiple.numericExtreme, undefined); assert.equal(multiple.droppedRequests.length, 2);
   assert.ok(fallbackParse('bottom 5%').droppedRequests.length); assert.ok(fallbackParse('spacious').droppedRequests.length);
   const independent = fallbackParse('10 min walk to Kitchener GO Station and 20 min bike to Conestoga Mall'); assert.equal(independent.travelTargets.length, 2); assert.equal(independent.travelTargets[0].maxMinutes, 10); assert.equal(independent.travelTargets[0].alternativeModes,undefined); assert.equal(independent.travelTargets[1].maxMinutes, 20); assert.equal(independent.travelTargets[1].mode, 'bike');
   assert.deepEqual(fallbackParse('rent at least $1,800').criteria.rent?.value, { min: 1800 });
@@ -92,7 +87,6 @@ test('explicit static sorts and both building-age directions survive basic parsi
     assert.equal(intent.criteria.buildingAge, undefined);
   }
   const building = fallbackParse('top 5% newest apartments');
-  assert.equal(building.numericExtreme?.field, 'buildingAge');
   assert.equal(building.sortBy, 'best_match');
 });
 test('known places ambiguity, representative labels and honest unknown business', async () => {
@@ -273,6 +267,28 @@ test('known hard travel bounds cannot be softened, omitted or widened by AI', as
   const result = await service.parse({ prompt: preferred }, 'ip');
   assert.equal(result.parser, 'gemini');
   assert.equal(result.intent.travelTargets[0].hard, false);
+});
+
+test('only explicit flexibility makes a criterion or trip optional', async () => {
+  const prompt = 'Preferably furnished, parking, around 5 minutes walking to UW and less than 5 minutes biking to Kitchener GO Station, near Conestoga Mall';
+  const basic = fallbackParse(prompt);
+  const check = (intent: typeof basic) => {
+    assert.equal(intent.criteria.furnished?.hard, false);
+    assert.equal(intent.criteria.parking?.hard, true);
+    assert.deepEqual(intent.travelTargets.map(t => [t.maxMinutes, t.hard]), [[5, false], [5, true], [undefined, true]]);
+  };
+  check(basic);
+  const model = structuredClone(basic);
+  for (const value of Object.values(model.criteria)) value.hard = !value.hard;
+  for (const target of model.travelTargets) target.hard = !target.hard;
+  const service = new ParseService({ provider: { generateStructured: async <T>() => model as T, generateText: async () => '' } });
+  const result = await service.parse({ prompt }, 'explicit-flexibility');
+  assert.equal(result.parser, 'gemini');
+  check(result.intent);
+  const unnamed = fallbackParse('around 5 minutes to Maple Gym and less than 5 minutes to Cedar Arena');
+  assert.deepEqual(unnamed.travelTargets.map(t => [t.query, t.maxMinutes, t.hard]), [
+    ['Maple Gym', 5, false], ['Cedar Arena', 5, true],
+  ]);
 });
 
 test('arbitrary mode-less travel bounds remain strict when AI softens, widens or changes the mode', async () => {

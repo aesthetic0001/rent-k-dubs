@@ -121,7 +121,6 @@ const noteLabels: Record<string, MessageKey> = {
   utilitiesIncluded: "results.notes.utilities",
   availableBy: "results.notes.availableBy",
   leaseTerm: "results.notes.lease",
-  priceFairness: "results.notes.priceFairness",
   safety: "results.notes.safety",
 };
 

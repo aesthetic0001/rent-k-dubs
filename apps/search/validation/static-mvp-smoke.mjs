@@ -34,7 +34,6 @@ try {
     ['apartments at least 20 years old', value => assert.deepEqual(value.criteria.buildingAge.value, { builtBefore: new Date().getUTCFullYear() - 20 })],
     ['bottom 5% rent minimum 100 results', value => {
       assert.equal(value.criteria.rent, undefined);
-      assert.equal(value.numericExtreme.minimumCount, 100);
     }],
   ];
   for (const [prompt, check] of parseChecks) check((await call('/api/search/parse', { prompt })).intent);
@@ -51,12 +50,6 @@ try {
   assert.ok(results.results.every((row, i, rows) => row.listing.dataStatus === 'live' && row.listing.bedrooms === 2 && row.listing.unitType === 'apartment' && (!i || rows[i-1].listing.monthlyRentCad<=row.listing.monthlyRentCad)));
   const warm = await call('/api/listings/search', request);
   assert.deepEqual(warm, results);
-  const percentile = await call('/api/listings/search', { ...request, intent: { ...intent, numericExtreme: { field: 'rent', direction: 'min', percentage: 5 } } });
-  const count = Math.min(expected.length, Math.max(10, Math.ceil(expected.length * .05)));
-  assert.equal(percentile.eligibleCount, expected.length);
-  assert.equal(percentile.results.length, count);
-  const cutoff = expected[count-1].rent;
-  assert.ok(percentile.results.every(row => row.listing.monthlyRentCad <= cutoff));
   const row = results.results[0];
   const detail = await call(`/api/listings/${row.listing.id}?intent=${encodeURIComponent(JSON.stringify(intent))}`);
   assert.deepEqual(detail.listing, row.listing);
@@ -83,9 +76,6 @@ try {
   } } });
   assert.equal(staticFields.eligibleCount, staticExpected.length);
   assert.deepEqual(new Set(staticFields.results.map(row => row.listing.id)), new Set(staticExpected.map(row => row.id)));
-  const fairness = await call('/api/listings/search', { ...narrow, intent: { ...narrow.intent, criteria: { ...narrow.intent.criteria, priceFairness: { value: ['underpriced'], hard: true } } } });
-  assert.equal(fairness.status, 'completed');
-  assert.ok(fairness.results.length > 0 && fairness.results.every(row => row.valuation.priceLabel === 'underpriced'));
   const safetyIntent = { ...narrow.intent, safety: { enabled: true, hard: false } };
   const withSafety = await call('/api/listings/search', { ...narrow, intent: safetyIntent });
   assert.ok(withSafety.results.length > 0 && withSafety.eligibleCount <= 500);
@@ -100,27 +90,5 @@ try {
   const expectedSafety = withSafety.results.filter(result => result.safety.relativeRate <= maxRelativeRate);
   assert.equal(hardSafety.eligibleCount, expectedSafety.length);
   assert.deepEqual(new Set(hardSafety.results.map(result => result.listing.id)), new Set(expectedSafety.map(result => result.listing.id)));
-  const travelIntent = { ...narrow.intent, numericExtreme: { field: 'travel', direction: 'min', percentage: 5, targetId: 'union' }, travelTargets: [{ id: 'union', kind: 'place', label: 'Union Station', query: 'Union Station', mode: 'walk', hard: false, resolved: { lng: -79.3806, lat: 43.6453, label: 'Union Station', source: 'known_place' } }] };
-  const job = await call('/api/listings/search', { ...narrow, intent: travelIntent });
-  assert.equal(job.status, 'pending');
-  let terminal;
-  for (let attempt = 0; attempt < 50; attempt++) {
-    terminal = await call(job.pollUrl);
-    if (terminal.status !== 'pending') break;
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  assert.equal(terminal.status, 'unavailable');
-  assert.equal(terminal.reason, 'routing_incomplete');
-  await call(job.pollUrl, undefined, 410);
-  const broadJob = await call('/api/listings/search', { intent: { ...travelIntent, criteria: {}, areas: [] } });
-  assert.equal(broadJob.status, 'pending');
-  for (let attempt = 0; attempt < 50; attempt++) {
-    terminal = await call(broadJob.pollUrl);
-    if (terminal.status !== 'pending') break;
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  assert.equal(terminal.status, 'unavailable');
-  assert.equal(terminal.reason, 'routing_incomplete');
-  await call(broadJob.pollUrl, undefined, 410);
-  console.log(JSON.stringify({ parser: parsed.parser, eligible: expected.length, returned: results.results.length, percentile: count, liveDetail: true, overlappingSearches: true, staticSizeAgeTypeAc: true, compoundPromptParsing: true, hardFairness: true, liveSafety: true, asyncJobs: true, broadMissingRouter: true, measurements }, null, 2));
+  console.log(JSON.stringify({ parser: parsed.parser, eligible: expected.length, returned: results.results.length, liveDetail: true, overlappingSearches: true, staticSizeAgeTypeAc: true, compoundPromptParsing: true, liveSafety: true, measurements }, null, 2));
 } finally { await sql.end({ timeout: 1 }); }

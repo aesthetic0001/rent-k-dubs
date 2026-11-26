@@ -38,6 +38,16 @@ test('AI civic IDs require exact catalogue identity and evidence for that actual
     assert.equal(cleanAIIntent(intent, prompt, areas).areas.length, 0);
   }
 });
+test('area matching chooses the full civic name at each mention', () => {
+  const catalogue: CivicArea[] = [
+    { kind: 'neighbourhood', id: 'beechwood', name: 'Beechwood', number: null },
+    { kind: 'neighbourhood', id: 'west', name: 'Beechwood West', number: null },
+  ];
+  assert.deepEqual(fallbackParse('Within the neighbourhood of Beechwood West.', undefined, catalogue).areas,
+    [{ kind: 'neighbourhood', id: 'west' }]);
+  assert.deepEqual(fallbackParse('In Beechwood or in Beechwood West.', undefined, catalogue).areas,
+    [{ kind: 'neighbourhood', id: 'beechwood' }, { kind: 'neighbourhood', id: 'west' }]);
+});
 test('parse input includes authoritative catalogue and known labels; catalogue changes isolate cache', async () => {
   let calls = 0, catalogue = areas;
   const service = new ParseService({ cache: new MemoryCache(), civicAreas: async () => catalogue, provider: {

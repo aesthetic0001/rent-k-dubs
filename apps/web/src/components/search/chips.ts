@@ -19,7 +19,6 @@ export const MODES = ["transit", "drive", "walk", "bike"] as const satisfies rea
 /** Chip order follows the supported-criteria table (SPEC 5). */
 const CRITERIA_ORDER = [
   "rent",
-  "priceFairness",
   "bedrooms",
   "bathrooms",
   "sizeSqft",
@@ -38,7 +37,7 @@ const CRITERIA_ORDER = [
 export type Chip = {
   /** The fieldSources key, unique per chip (areas share `areas` for their phrase). */
   key: string;
-  kind: "criterion" | "travel" | "safety" | "area" | "household" | "sort" | "extreme";
+  kind: "criterion" | "travel" | "safety" | "area" | "household" | "sort";
   label: string;
   /** Must-have (true) or preference (false); null when the chip can't be switched. */
   hard: boolean | null;
@@ -90,10 +89,6 @@ function criterionLabel(criteria: Criteria, field: CriterionField): string | nul
   switch (field) {
     case "rent":
       return criteria.rent ? boundLabel(criteria.rent.value, "rent") : null;
-    case "priceFairness":
-      return criteria.priceFairness
-        ? or(criteria.priceFairness.value.map((label) => tk(`fairness.${label}`)))
-        : null;
     case "bedrooms":
       return criteria.bedrooms ? rangeLabel(criteria.bedrooms.value, "bedrooms") : null;
     case "bathrooms":
@@ -253,21 +248,6 @@ export function buildChips(intent: SearchIntent): Chip[] {
     });
   }
 
-  if (intent.numericExtreme) {
-    const { direction, percentage, field } = intent.numericExtreme;
-    chips.push({
-      key: "numericExtreme",
-      kind: "extreme",
-      label: tk("extreme", {
-        direction: tk(`directions.${direction}`),
-        percentage: decimal.format(percentage),
-        field: tk(`extremeFields.${field}`),
-      }),
-      hard: null,
-      ...sourceOf("numericExtreme"),
-    });
-  }
-
   return chips;
 }
 
@@ -340,11 +320,6 @@ export function removeChip(intent: SearchIntent, chip: Chip): SearchIntent {
         travelTargets: intent.travelTargets.filter((target) => target.id !== chip.targetId),
         fieldSources: withoutSource(intent, chip.key),
       };
-      // A percentile over this target's travel time no longer has a target.
-      if (next.numericExtreme?.targetId === chip.targetId) {
-        delete next.numericExtreme;
-        next.fieldSources = withoutSource(next, "numericExtreme");
-      }
       return next;
     }
     case "safety": {
@@ -376,14 +351,6 @@ export function removeChip(intent: SearchIntent, chip: Chip): SearchIntent {
     }
     case "sort":
       return { ...intent, sortBy: "best_match", fieldSources: withoutSource(intent, "sortBy") };
-    case "extreme": {
-      const next: SearchIntent = {
-        ...intent,
-        fieldSources: withoutSource(intent, "numericExtreme"),
-      };
-      delete next.numericExtreme;
-      return next;
-    }
   }
 }
 

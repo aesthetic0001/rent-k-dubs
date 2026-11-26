@@ -14,7 +14,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { engineConfig } from "@rentkdubs/shared/engine/config";
 import { scoreWeights } from "@rentkdubs/shared/engine/score";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -179,7 +178,7 @@ function hardOf(draft: SearchIntent, field: Field): boolean | null {
 }
 
 function PriceSection({ draft, edit }: SectionProps) {
-  const { rent, priceFairness } = draft.criteria;
+  const { rent } = draft.criteria;
   return (
     <PanelSection title={p("sections.price")}>
       <CriterionField
@@ -194,23 +193,6 @@ function PriceSection({ draft, edit }: SectionProps) {
           step={50}
           onChange={(min, max) =>
             edit((d) => setCriterion(d, "rent", range(parseNumber(min), parseNumber(max))))
-          }
-        />
-      </CriterionField>
-      <CriterionField
-        label={p("priceFairness")}
-        help={p("priceFairnessHelp")}
-        hard={hardOf(draft, "priceFairness")}
-        onHardChange={(hard) => edit((d) => setCriterionHard(d, "priceFairness", hard))}
-      >
-        <CheckboxGroup
-          options={(["underpriced", "reasonable", "overpriced"] as const).map((value) => ({
-            value,
-            label: chipText(`fairness.${value}`),
-          }))}
-          value={priceFairness?.value}
-          onChange={(next) =>
-            edit((d) => setCriterion(d, "priceFairness", next.length ? next : undefined))
           }
         />
       </CriterionField>
@@ -661,7 +643,7 @@ type Part = (typeof PARTS)[number];
 
 /**
  * "What matters most" (SPEC 7.5): one slider per match-score part. They start at the weights the
- * search already uses (`scoreWeights`, so a "good deal" or safety opt-in shows), and the share beside
+ * search already uses (`scoreWeights`), and the share beside
  * each is its part of the total. Reset drops the renter's weights and goes back to the defaults.
  */
 function PrioritiesSection({ draft, edit }: SectionProps) {
@@ -733,7 +715,7 @@ function PriorityRow({
       <Slider
         id={id}
         min={0}
-        max={engineConfig.fairnessWeight * 2}
+        max={90}
         step={5}
         value={[value]}
         onValueChange={([next]) => onChange(next)}

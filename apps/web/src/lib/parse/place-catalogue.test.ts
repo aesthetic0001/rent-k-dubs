@@ -74,6 +74,18 @@ test('busy AI preserves locally resolved places and independent travel bounds', 
   assert.ok(placeCatalogue.lookup('King and University')!.places[0].sourceIds.includes('waterloo-intersection:8986'));
 });
 
+test('a possessive campus name keeps its building and the next sentence owns its trip', async () => {
+  const building = "university of waterloo's E7 building";
+  const prompt = `1 bed 1 bath, within 10 minutes walk of ${building}. within 15 minutes transit to T&T`;
+  assert.deepEqual(placeCatalogue.mentions(prompt).map(mention => mention.query), [building]);
+  assert.equal(placeCatalogue.lookup(building, false)?.places[0]?.id, 'uw-building:pse');
+  assert.equal((await new DestinationResolver().resolve(building)).status, 'resolved');
+  const trips = fallbackParse(prompt, undefined, [], undefined, [{ start: prompt.indexOf('T&T'), end: prompt.length, query: 'T&T' }]).travelTargets;
+  assert.deepEqual(trips.map(t => [t.query, t.mode, t.maxMinutes, t.hard]), [
+    [building, 'walk', 10, true], ['T&T', 'transit', 15, true],
+  ]);
+});
+
 test('every eligible generated name and alias remains locally reachable with source provenance', () => {
   for (const record of generated) {
     for (const name of [record.label, ...record.aliases]) {

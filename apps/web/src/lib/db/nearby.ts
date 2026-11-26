@@ -85,6 +85,7 @@ export async function loadNearby(
   sql: NonNullable<ReturnType<typeof getClient>>,
   listingId: string,
   categories: readonly PoiCategory[],
+  schoolLevel?: z.infer<typeof SchoolLevel>,
 ): Promise<NearbyResponse | null> {
   const rows = await sql<NearbyRow[]>`
     WITH l AS (SELECT id, location, location_precision FROM listings WHERE id = ${listingId})
@@ -104,6 +105,7 @@ export async function loadNearby(
       SELECT * FROM (
         SELECT DISTINCT ON (pois.name) pois.*, pois.location <-> l.location AS gap
         FROM pois WHERE pois.category = c.category
+          AND (c.category <> 'school' OR ${schoolLevel ?? null}::text IS NULL OR pois.subcategory = ${schoolLevel ?? null})
         ORDER BY pois.name, gap
       ) nearest_piece
       ORDER BY gap LIMIT ${PLACES_PER_CATEGORY}
@@ -128,6 +130,7 @@ export async function loadNearby(
   return nearbyFromRows(listingId, categories, rows);
 }
 
+const SchoolLevel = z.enum(["elementary", "secondary"]);
 const Params = z.strictObject({ id: z.uuid() });
 /** `?categories=grocery,school` (any of the eight); all of them when absent. */
 const Categories = z
@@ -144,12 +147,14 @@ export function createNearbyRoute(client: typeof getClient = getClient) {
     { name: "listings.nearby" },
     async (_input, request, context) => {
       const { id } = Params.parse(await context.params);
-      const raw = new URL(request.url).searchParams.get("categories");
+      const query = new URL(request.url).searchParams;
+      const raw = query.get("categories");
+      const schoolLevel = SchoolLevel.optional().parse(query.get("schoolLevel") ?? undefined);
       const categories = raw === null ? NEARBY_CATEGORIES : Categories.parse(raw);
       const sql = client();
       if (!sql)
         throw new ApiError(503, "service_unavailable", "Nearby places temporarily unavailable");
-      const nearby = await loadNearby(sql, id, categories);
+      const nearby = await loadNearby(sql, id, categories, schoolLevel);
       if (!nearby) throw new ApiError(404, "listing_not_found", "Listing not found");
       return nearby;
     },

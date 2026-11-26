@@ -1,13 +1,15 @@
 // Points of interest for travel targets ("close to groceries") and the listing page's "nearby"
 // panel, in and around the City of Waterloo.
 //
-// Everything comes from OpenStreetMap (Overpass API): its Waterloo coverage has every category
-// we need, so one query replaces Toronto's mix of City open data and OSM. The box reaches a few
+// OpenStreetMap supplies POI identity, category and location. Municipal records and OSM building
+// addresses fill metadata where the source POI leaves it blank. The box reaches a few
 // km past the City line, so a listing near the edge finds the grocery store across it in
 // Kitchener. `category` must stay inside the CHECK constraint on `pois`; `subcategory` carries
 // the finer distinction the engine needs (elementary vs secondary school).
 import type { Sql } from "postgres";
+import { distanceM } from "../pipeline/dedupe.ts";
 import { postFormJson } from "./lib/http.ts";
+import { enrichPoiRows, fillPoiMetadata, poiCoordinates } from "./poi-metadata.ts";
 import { upsertSource } from "./sources.ts";
 
 export type Category =
@@ -25,6 +27,10 @@ export interface PoiRow {
   category: Category;
   subcategory: string | null;
   name: string;
+  street_name: string | null;
+  house_number: string | null;
+  city: string | null;
+  aliases: string[];
   location: string;
   source_id: string;
 }
@@ -47,12 +53,14 @@ export interface OverpassElement {
   lon?: number;
   center?: { lat: number; lon: number };
   tags?: Record<string, string>;
+  geometry?: { lat: number; lon: number }[];
   /** A relation's parts with their shapes (`out geom`). */
   members?: { type: string; role?: string; geometry?: { lat: number; lon: number }[] }[];
 }
 
 interface OverpassResponse {
   elements?: OverpassElement[];
+  remark?: string;
   osm3s?: { timestamp_osm_base?: string };
 }
 
@@ -182,7 +190,8 @@ export function poiRow(element: OverpassElement): PoiRow | null {
   const name = tags.name?.trim();
   const lat = element.lat ?? element.center?.lat;
   const lon = element.lon ?? element.center?.lon;
-  if (!name || lat === undefined || lon === undefined) return null;
+  if (!name || typeof lat !== "number" || !Number.isFinite(lat) || Math.abs(lat) > 90 ||
+      typeof lon !== "number" || !Number.isFinite(lon) || Math.abs(lon) > 180) return null;
   let category: Category;
   let subcategory: string | null = null;
   if (tags.shop && /^(supermarket|greengrocer|grocery)$/.test(tags.shop)) {
@@ -207,6 +216,13 @@ export function poiRow(element: OverpassElement): PoiRow | null {
     category,
     subcategory,
     name,
+    street_name: (tags["addr:street"] ?? tags["contact:street"])?.trim() || null,
+    house_number: (tags["addr:housenumber"] ?? tags["contact:housenumber"])?.trim() || null,
+    city: (tags["addr:city"] ?? tags["contact:city"])?.trim() || null,
+    aliases: [...new Set(Object.keys(tags)
+      .filter(key => ["alt_name", "short_name", "official_name", "loc_name"].includes(key) || /^name:[a-z]{2,3}(?:-[a-z]+)?$/i.test(key))
+      .flatMap(key => tags[key]!.split(";").map(alias => alias.trim()))
+      .filter(alias => alias && alias !== name))],
     location: `SRID=4326;POINT(${lon} ${lat})`,
     source_id: SOURCE_ID,
   };
@@ -223,47 +239,70 @@ export async function loadPois(sql: Sql): Promise<PoiLoad> {
     "https://overpass-api.de/api/interpreter",
     `data=${encodeURIComponent(overpassQuery())}`,
   );
+  if (body.remark || !Array.isArray(body.elements)) throw new Error("pois: incomplete Overpass response; keeping the current table");
   // An element can match two selectors (a park that's also a community centre); first wins.
   const byId = new Map<string, PoiRow>();
-  for (const element of body.elements ?? []) {
+  for (const element of body.elements) {
     for (const row of poiRows(element)) if (!byId.has(row.id)) byId.set(row.id, row);
   }
   const rows = [...byId.values()];
   if (rows.length < MIN_ROWS) {
     throw new Error(`pois: only ${rows.length} rows from Overpass; keeping the current table`);
   }
-
-  await upsertSource(sql, {
-    id: SOURCE_ID,
-    title: "OpenStreetMap — Overpass API",
-    url: "https://www.openstreetmap.org/copyright",
-    licence: "ODbL 1.0",
-    period: body.osm3s?.timestamp_osm_base?.slice(0, 10) ?? null,
-    note: `Overpass bbox ${WATERLOO_BBOX}; © OpenStreetMap contributors`,
-  });
-
-  // 500 rows per statement keeps the parameter count well inside Postgres' limit.
-  for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500);
-    await sql`
-      insert into pois ${sql(chunk, "id", "category", "subcategory", "name", "location", "source_id")}
-      on conflict (id) do update set
-        category = excluded.category,
-        subcategory = excluded.subcategory,
-        name = excluded.name,
-        location = excluded.location,
-        source_id = excluded.source_id,
-        updated_at = now()
-    `;
+  if (new Set(rows.map(row => row.category)).size !== 8) {
+    throw new Error("pois: Overpass response is missing categories; keeping the current table");
   }
-  // Places gone from OSM (and any earlier source's rows) leave with this load.
-  const removed = (await sql`delete from pois where not (id = any(${rows.map((row) => row.id)}))`)
-    .count;
+  const metadataSources = await enrichPoiRows(sql, rows);
 
-  const counts = await sql<{ category: string; count: number }[]>`
-    select category, count(*)::int as count from pois group by category order by category
-  `;
-  const byCategory: Record<string, number> = {};
-  for (const row of counts) byCategory[row.category] = row.count;
-  return { written: rows.length, removed, byCategory };
+  return sql.begin(async tx => {
+    await tx`select pg_advisory_xact_lock(hashtext('civic-pois'))`;
+    await upsertSource(tx, {
+      id: SOURCE_ID,
+      title: "OpenStreetMap — Overpass API",
+      url: "https://www.openstreetmap.org/copyright",
+      licence: "ODbL 1.0",
+      period: body.osm3s?.timestamp_osm_base?.slice(0, 10) ?? null,
+      note: `Overpass bbox ${WATERLOO_BBOX}; © OpenStreetMap contributors`,
+    });
+    for (const source of metadataSources) await upsertSource(tx, source);
+
+    // Keep verified metadata through feed outages, while clearing it for a renamed or moved object.
+    const previous = await tx<(Omit<PoiRow, "location" | "source_id" | "subcategory"> & { lat: number; lng: number })[]>`
+      select id, category, name, street_name, house_number, city, aliases,
+        ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
+      from pois where source_id = ${SOURCE_ID}
+    `;
+    for (const old of previous) {
+      const row = byId.get(old.id);
+      if (!row || row.name !== old.name || row.category !== old.category) continue;
+      if (distanceM(old, poiCoordinates(row)) < 15) fillPoiMetadata(row, old);
+    }
+
+    // 500 rows per statement keeps the parameter count well inside Postgres' limit.
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      await tx`
+        insert into pois ${tx(chunk.map(row => ({ ...row, aliases: tx.json(row.aliases) })),
+          "id", "category", "subcategory", "name", "street_name", "house_number", "city", "aliases", "location", "source_id")}
+        on conflict (id) do update set
+          category = excluded.category,
+          subcategory = excluded.subcategory,
+          name = excluded.name,
+          street_name = excluded.street_name,
+          house_number = excluded.house_number,
+          city = excluded.city,
+          aliases = excluded.aliases,
+          location = excluded.location,
+          source_id = excluded.source_id,
+          updated_at = now()
+      `;
+    }
+    const removed = (await tx`delete from pois where source_id = ${SOURCE_ID}
+      and not (id = any(${rows.map((row) => row.id)}))`).count;
+
+    const counts = await tx<{ category: string; count: number }[]>`
+      select category, count(*)::int as count from pois group by category order by category
+    `;
+    return { written: rows.length, removed, byCategory: Object.fromEntries(counts.map(row => [row.category, row.count])) };
+  });
 }

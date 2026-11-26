@@ -11,12 +11,10 @@ import { scoreListing } from '../../../../../packages/shared/engine/score';
 const request = (path: string, body?: unknown) => new Request(`http://localhost/api/${path}`, body === undefined ? undefined : { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
 const context = (id: string) => ({ params: Promise.resolve({ id }) });
 const tick = () => new Promise(resolve => setTimeout(resolve, 5));
-const exact = { intent: { ...travelIntent, numericExtreme: { field: 'travel' as const, direction: 'min' as const, percentage: 5, minimumCount: 10, targetId: 'campus' } }, hideUnconfirmed: false };
 test('request boundary errors, unknowns, streamed limit, paths, queries, sanitized server errors', async () => {
   const api = createRuntime({ env: { SEARCH_FIXTURES: '1' } });
   for (const body of [{ prompt: '' }, { prompt: 'hi', unexpected: 1 }]) assert.equal((await api.parse(request('search/parse', body), undefined)).status, 422);
   for (const body of ['{', ' '.repeat(65537)]) assert.equal((await api.parse(new Request('http://localhost', { method: 'POST', body }), undefined)).status, 422);
-  assert.equal((await api.search(request('listings/search', { intent: { ...baseIntent, numericExtreme: [] } }), undefined)).status, 422);
   for (const path of ['geo/resolve', 'geo/resolve?q=a&q=b', 'geo/resolve?q=x&extra=1', `geo/resolve?q=${'x'.repeat(501)}`]) assert.equal((await api.resolve(request(path), undefined)).status, 422);
   assert.equal((await api.detail(request('listings/x?intent={}'), context('invalid'))).status, 422);
   assert.equal((await api.detail(request('listings/x?intent={'), context(sampleListings[0].id))).status, 422);
@@ -25,24 +23,21 @@ test('request boundary errors, unknowns, streamed limit, paths, queries, sanitiz
   const broken = jsonRoute({ name: 'test' }, async () => { throw Error('SECRET prompt'); });
   const response = await broken(request('test'), undefined); assert.equal(response.status, 500); assert.ok(!JSON.stringify(await response.json()).includes('SECRET'));
 });
-test('safe anonymous quotas ignore forged forwarding headers; start and poll quotas enforce 429', async () => {
+test('safe anonymous quotas ignore forged forwarding headers and enforce poll limits', async () => {
   const api = createRuntime({ env: { SEARCH_FIXTURES: '1' }, limiter: new IpLimiter(1), pollLimiter: new IpLimiter(1) });
   assert.equal((await api.resolve(request('geo/resolve?q=Union%20Station'), undefined)).status, 200);
   const forged = new Request('http://localhost/api/geo/resolve?q=Union%20Station', { headers: { 'x-forwarded-for': 'new-ip' } });
   const limited = await api.resolve(forged, undefined); assert.equal(limited.status, 429); assert.equal(limited.headers.get('Retry-After'), '60');
   const token = 'a'.repeat(43), ctx = { params: Promise.resolve({ token }) };
   assert.equal((await api.poll(request('jobs'), ctx)).status, 410); assert.equal((await api.poll(request('jobs'), ctx)).status, 429);
-  const starts = createRuntime({ env: { SEARCH_FIXTURES: '1' }, startLimiter: new IpLimiter(1) });
-  assert.equal((await starts.search(request('listings/search', exact), undefined)).status, 200);
-  assert.equal((await starts.search(request('listings/search', exact), undefined)).status, 429); starts.jobs.dispose();
 });
-test('Vercel platform IP isolates all quota classes and preserves custom identity', async () => {
-  const api = createRuntime({ env: { SEARCH_FIXTURES: '1', VERCEL: '1' }, limiter: new IpLimiter(1), startLimiter: new IpLimiter(1), pollLimiter: new IpLimiter(1) });
+test('Vercel platform IP isolates request and polling quotas and preserves custom identity', async () => {
+  const api = createRuntime({ env: { SEARCH_FIXTURES: '1', VERCEL: '1' }, limiter: new IpLimiter(1), pollLimiter: new IpLimiter(1) });
   const forwarded = (req: Request, ip: string) => { req.headers.set('x-vercel-forwarded-for', ip); req.headers.set('x-forwarded-for', '203.0.113.99'); return req; };
   const ips = ['192.0.2.1', '2001:db8::1'];
   const ctx = { params: Promise.resolve({ token: 'a'.repeat(43) }) };
   for (const ip of ips) {
-    assert.equal((await api.search(forwarded(request('listings/search', exact), ip), undefined)).status, 200);
+    assert.equal((await api.search(forwarded(request('listings/search', { intent: travelIntent }), ip), undefined)).status, 200);
     const limited = await api.resolve(forwarded(request('geo/resolve?q=Union%20Station'), ip), undefined);
     assert.equal(limited.status, 429); assert.equal(limited.headers.get('Retry-After'), '60');
     assert.deepEqual(await limited.json(), { error: { code: 'rate_limited', message: 'Too many requests', retryAfterSeconds: 60 } });
@@ -50,12 +45,6 @@ test('Vercel platform IP isolates all quota classes and preserves custom identit
     assert.equal((await api.poll(forwarded(request('jobs'), ip), ctx)).status, 429);
   }
   api.jobs.dispose();
-  const starts = createRuntime({ env: { SEARCH_FIXTURES: '1', VERCEL: '1' }, startLimiter: new IpLimiter(1) });
-  for (const ip of ips) {
-    assert.equal((await starts.search(forwarded(request('listings/search', exact), ip), undefined)).status, 200);
-    assert.equal((await starts.search(forwarded(request('listings/search', exact), ip), undefined)).status, 429);
-  }
-  starts.jobs.dispose();
   const custom = createRuntime({ env: { SEARCH_FIXTURES: '1', VERCEL: '1' }, identity: () => 'injected-server-identity', limiter: new IpLimiter(1) });
   assert.equal((await custom.parse(forwarded(request('search/parse', { prompt: 'cheapest' }), ips[0]), undefined)).status, 200);
   assert.equal((await custom.parse(forwarded(request('search/parse', { prompt: 'cheapest' }), ips[1]), undefined)).status, 429);
@@ -94,7 +83,6 @@ test('default listing dependencies unavailable; parsing/resolution work; fixture
   const detail = DetailResponseSchema.parse(await (await fixtures.detail(request('listings/x?intent='+encodeURIComponent(JSON.stringify(intent))), context(search.results[0].listing.id))).json());
   assert.deepEqual(detail.matchScore, search.results[0].matchScore); assert.deepEqual(detail.travel, search.results[0].travel);
   assert.equal((await fixtures.detail(request('listings/x?intent='+encodeURIComponent(JSON.stringify(travelIntent))), context(search.results[0].listing.id))).status, 422);
-  const scalar = SearchResponseSchema.parse(await (await fixtures.search(request('listings/search', { intent: { ...baseIntent, numericExtreme: { field: 'rent', direction: 'min', percentage: 5 } } }), undefined)).json()); assert.equal(scalar.status, 'completed');
 });
 test('briefing data failures use a translatable service error', async () => {
   const api = createRuntime({ env: { DATABASE_URL: 'configured' } });
@@ -140,7 +128,7 @@ const prompts = [
   "I'm looking for houses or apartments around the university of waterloo. Should be within 10 minutes biking distance. Around 3-5k per",
   "I work at Grand River Hospital. I'm looking for a place to commute, bike, or walk to work, and it should take no longer than 10 minutes.",
   "I'm on a budget. I wanna live in Uptown at the cheapest cost",
-  'Room or studio near Wilfrid Laurier University under $1,300, close to an ION station, furnished.',
+  'Room or studio under $1,300, ideally near Wilfrid Laurier University, close to an ION station, furnished.',
   'I need a 2-bedroom near University of Waterloo under $2,800, within 25 minutes by transit, close to groceries, cat-friendly, and I really care about getting a good deal. I make about $95k with my roommate.',
   '3 bedrooms in Beechwood under $3,200, near a public school and a park, parking.',
 ];
@@ -166,19 +154,6 @@ test('all six acceptance prompts traverse fallback and mocked Gemini APIs, with 
       }
     }
     const resolved = await (await api.resolve(request('geo/resolve?q=UW'), undefined)).json(); assert.equal(resolved.status, 'resolved'); assert.equal(resolved.destination.resolved.representativePoint, true);
-  }
-});
-test('async API completion, incomplete routing, terminal consumption, unknown/restarted tokens', async () => {
-  for (const complete of [false, true]) {
-    const dependencies = { ...fixtureDependencies, ...(complete ? { routeTimes: async (origins: typeof sampleListings, targets: typeof travelIntent.travelTargets, mode: 'walk' | 'bike' | 'drive' | 'transit') => origins.flatMap(l => targets.map(t => ({ listingId: l.id, targetId: t.id, mode, distanceM: 100, minutes: 5, method: 'otp' as const, computedAt: l.lastSeenAt, poiId: null }))) } : {}) };
-    const api = createRuntime({ env: {}, dependencies });
-    const pending = SearchResponseSchema.parse(await (await api.search(request('listings/search', exact), undefined)).json()); assert.equal(pending.status, 'pending'); if (pending.status !== 'pending') return;
-    assert.equal(pending.jobToken.length, 43); assert.ok(!pending.jobToken.includes('campus')); await tick();
-    const ctx = { params: Promise.resolve({ token: pending.jobToken }) };
-    // Without a router the travel percentile still completes, ranked by straight-line distance.
-    const result = SearchResponseSchema.parse(await (await api.poll(request('jobs'), ctx)).json()); assert.equal(result.status, 'completed');
-    assert.equal((await api.poll(request('jobs'), ctx)).status, 410);
-    const fresh = createRuntime({ env: {} }); assert.equal((await fresh.poll(request('jobs'), ctx)).status, 410); api.jobs.dispose();
   }
 });
 test('ordinary routing and detail share validated actual travel/score, ignoring other listing rows', async () => {

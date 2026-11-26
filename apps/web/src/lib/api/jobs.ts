@@ -14,14 +14,14 @@ export class SearchJobs {
     const pending = SearchResponseSchema.parse({ status: 'pending', jobToken: token, pollUrl: `/api/listings/search/jobs/${token}`, expiresAt: new Date(Date.now() + ttl).toISOString() });
     const controller = new AbortController();
     const complete = (result: SearchResponse) => { const job = this.jobs.get(token); if (!job || job.result) return; job.result = result; clearTimeout(job.deadline); controller.abort(); };
-    const job: Job = { pending, controller, expiry: setTimeout(() => this.remove(token), ttl), deadline: setTimeout(() => complete({ status: 'unavailable', reason: 'timeout', message: 'Exact travel percentile timed out' }), budget) };
+    const job: Job = { pending, controller, expiry: setTimeout(() => this.remove(token), ttl), deadline: setTimeout(() => complete({ status: 'unavailable', reason: 'timeout', message: 'Search timed out' }), budget) };
     job.expiry.unref?.(); job.deadline.unref?.();
     this.jobs.set(token, job);
     void Promise.resolve().then(() => work(controller.signal, deadline)).then(result => {
       const parsed = SearchResponseSchema.parse(result);
       if (parsed.status === 'pending') throw new Error('Execution must terminate');
       complete(parsed);
-    }).catch(() => complete({ status: 'unavailable', reason: 'routing_incomplete', message: 'Complete routed times unavailable; no partial percentile returned' }));
+    }).catch(() => complete({ status: 'unavailable', reason: 'routing_incomplete', message: 'Complete routed times unavailable' }));
     return pending;
   }
   poll(token: string): SearchResponse {

@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { AreaSchema, DetailResponseSchema, DestinationResolutionSchema, ListingSchema, MatchScoreSchema, NumericExtremeSchema, ParseRequestSchema, SearchIntentSchema, SearchRequestSchema, SearchResponseSchema, SearchResultSchema, TravelTimeRowSchema, ValuationSchema } from './index';
+import { AreaSchema, DetailResponseSchema, DestinationResolutionSchema, ListingSchema, MatchScoreSchema, ParseRequestSchema, SearchIntentSchema, SearchRequestSchema, SearchResponseSchema, SearchResultSchema, TravelTimeRowSchema, ValuationSchema } from './index';
 import { areas, baseIntent, detailFixture, listings, sampleListings, safetySearchFixture, searchFixture, travelIntent, valuations } from '../fixtures/index';
 
 test('50 synthetic listings, 3 areas, small sample, and representative responses initialize and validate', () => {
@@ -35,10 +35,23 @@ test('trust boundaries reject invalid ranges, dates, coordinates, discriminators
   assert.equal(SearchRequestSchema.parse({ intent: baseIntent }).hideUnconfirmed, false);
   assert.equal(ParseRequestSchema.safeParse({ prompt: '   ' }).success, false);
 });
-test('ONE numeric extreme selector, valid target references and positive finite weights', () => {
-  assert.equal(NumericExtremeSchema.parse({ field: 'rent', direction: 'min', percentage: 5 }).minimumCount, 10);
-  for (const numericExtreme of [[{ field: 'rent', direction: 'min', percentage: 5 }], { field: 'rent', direction: 'min', percentage: 101 }, { field: 'travel', direction: 'min', percentage: 5, targetId: 'missing' }]) assert.equal(SearchIntentSchema.safeParse({ ...baseIntent, numericExtreme }).success, false);
-  assert.equal(SearchIntentSchema.safeParse({ ...travelIntent, numericExtreme: { field: 'travel', direction: 'min', percentage: 5, targetId: 'campus' } }).success, true);
+test('legacy searches drop retired filters and keep other criteria', () => {
+  const rent = { value: { max: 2500 }, hard: true };
+  const parsed = SearchIntentSchema.parse({
+    ...baseIntent,
+    criteria: { rent, priceFairness: { value: ['reasonable'], hard: true } },
+    numericExtreme: { field: 'rent', direction: 'min', percentage: 5 },
+    fieldSources: {
+      'criteria.priceFairness': { source: 'user' },
+      numericExtreme: { source: 'user' },
+      'criteria.rent': { source: 'user' },
+    },
+  });
+  assert.deepEqual(parsed.criteria, { rent });
+  assert.deepEqual(parsed.fieldSources, { 'criteria.rent': { source: 'user' } });
+  assert.equal(Object.hasOwn(parsed, 'numericExtreme'), false);
+});
+test('positive finite weights', () => {
   for (const weights of [{ value: 0, price: 0, travel: 0, home: 0, safety: 0 }, { value: Infinity, price: 0, travel: 0, home: 0, safety: 0 }, { value: 30, price: 15, travel: 30, home: 25, safety: 1 }]) assert.equal(SearchIntentSchema.safeParse({ ...baseIntent, weights }).success, false);
 });
 test('straight-line distance never fabricates minutes; routed rows require minutes', () => {
@@ -97,5 +110,5 @@ test('structured choices and async envelopes distinguish ambiguity, pending and 
   const jobToken = 'x'.repeat(32);
   assert.equal(SearchResponseSchema.safeParse({ status: 'pending', jobToken, pollUrl: `/api/listings/search/jobs/${jobToken}`, expiresAt: '2026-10-16T12:02:00Z' }).success, true);
   assert.equal(SearchResponseSchema.safeParse({ status: 'pending', jobToken, pollUrl: `/api/listings/search/jobs/${'y'.repeat(32)}`, expiresAt: '2026-10-16T12:02:00Z' }).success, false);
-  assert.equal(SearchResponseSchema.safeParse({ status: 'unavailable', reason: 'routing_incomplete', message: 'Exact travel percentile unavailable' }).success, true);
+  assert.equal(SearchResponseSchema.safeParse({ status: 'unavailable', reason: 'routing_incomplete', message: 'Routing unavailable' }).success, true);
 });

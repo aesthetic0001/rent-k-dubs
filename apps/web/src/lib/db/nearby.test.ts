@@ -128,6 +128,15 @@ describe("GET /api/listings/[id]/nearby", () => {
     ]);
   });
 
+  it("filters school level in SQL before limiting the nearest places", async () => {
+    const sql = vi.fn(async (_strings: TemplateStringsArray, ..._values: unknown[]) => rows);
+    expect((await call(id, "?categories=school&schoolLevel=secondary", () => sql as never)).status).toBe(200);
+    const [statement, ...values] = sql.mock.calls[0];
+    expect(statement.join("?")).toMatch(/pois\.subcategory = \?[\s\S]+ORDER BY gap LIMIT/);
+    expect(values).toContain("secondary");
+    expect((await call(id, "?schoolLevel=invalid")).status).toBe(422);
+  });
+
   it("validates the id and categories, and reports a missing listing or database", async () => {
     expect((await call("not-a-uuid")).status).toBe(422);
     expect((await call(id, "?categories=casino")).status).toBe(422);

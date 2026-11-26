@@ -198,11 +198,6 @@
       "rentMax": "Up to {max}",
       "rentMin": "From {min}",
       "rentRange": "{min}–{max}",
-      "fairness": {
-        "underpriced": "Underpriced",
-        "reasonable": "Reasonably priced",
-        "overpriced": "Overpriced"
-      },
       "studio": "Studio",
       "bedroomsOne": "1 bedroom",
       "bedroomsExact": "{n} bedrooms",
@@ -263,19 +258,6 @@
         "closest_area": "closest to my area",
         "lowest_carbon": "lowest-carbon trips"
       },
-      "extreme": "{direction} {percentage}% by {field}",
-      "directions": {
-        "min": "Lowest",
-        "max": "Highest"
-      },
-      "extremeFields": {
-        "rent": "rent",
-        "bedrooms": "bedrooms",
-        "bathrooms": "bathrooms",
-        "sizeSqft": "size",
-        "buildingAge": "building age",
-        "travel": "distance"
-      },
       "safetyMax": "Crime at most {rate}× city rate"
     },
     "panel": {
@@ -303,8 +285,6 @@
       "yes": "Yes",
       "no": "No",
       "rent": "Rent per month",
-      "priceFairness": "Price compared with similar listings",
-      "priceFairnessHelp": "Compared with asking rents for similar listings nearby, not signed leases.",
       "bedrooms": "Bedrooms",
       "bedroomsHelp": "0 means a studio.",
       "bathrooms": "Bathrooms",
@@ -421,7 +401,6 @@
       "utilities": "Utilities",
       "availableBy": "Available by",
       "lease": "Lease",
-      "priceFairness": "Price compared with similar listings",
       "safety": "Reported crime levels"
     },
     "approx": "Approximate location",
@@ -983,7 +962,7 @@
     "score": {
       "intro": "Listings that fail one of your must-haves are left out. The rest get a match score from 0 to 100, made of five parts:",
       "parts": {
-        "value": "Value ({weight}%, or {fairness}% if you ask for a good deal): the rent against our estimate.",
+        "value": "Value ({weight}%): the rent against our estimate.",
         "price": "Price ({weight}%): how the rent sits against your budget, when the budget is a preference.",
         "travel": "Travel ({weight}%): time to your places against your target.",
         "home": "Home ({weight}%): how the unit matches your wishes: bedrooms, size, AC, laundry, pets and so on.",

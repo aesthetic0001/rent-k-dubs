@@ -24,21 +24,12 @@ invalid=call('/api/listings/search',{},422)
 assert invalid['error']['code']=='validation_error'
 travel=call('/api/search/parse',{'prompt':'within 10 minutes biking to Union Station'})['intent']
 assert travel['travelTargets'] and travel['travelTargets'][0]['resolved']
-travel['numericExtreme']={'field':'travel','direction':'min','percentage':5,'targetId':travel['travelTargets'][0]['id']}
-pending=call('/api/listings/search',{'intent':travel})
-assert pending['status']=='pending' and len(pending['jobToken'])>=32
-for _ in range(20):
-    terminal=call(pending['pollUrl'])
-    if terminal['status']!='pending':break
-    time.sleep(.01)
-assert terminal['status']=='unavailable' and terminal['reason']=='routing_incomplete'
-assert call(pending['pollUrl'],expected=410)['error']['code']=='search_job_expired'
-scalar={**redacted,'numericExtreme':{'field':'rent','direction':'min','percentage':5}}
+assert call('/api/listings/search',{'intent':travel})['status']=='completed'
 bench={}
-for name,action in [('fallback_parse',lambda:call('/api/search/parse',{'prompt':'cheapest downtown apartment'})),('ordinary_search',lambda:call('/api/listings/search',{'intent':redacted})),('scalar_percentile',lambda:call('/api/listings/search',{'intent':scalar})),('context_detail',lambda:call(detailPath))]:
+for name,action in [('fallback_parse',lambda:call('/api/search/parse',{'prompt':'cheapest downtown apartment'})),('ordinary_search',lambda:call('/api/listings/search',{'intent':redacted})),('context_detail',lambda:call(detailPath))]:
     samples=[]
     for _ in range(8):
         start=time.perf_counter();out=action();samples.append((time.perf_counter()-start)*1000)
         assert 'error' not in out
     samples.sort();bench[name]={'medianMs':round(statistics.median(samples),2),'p95Ms':round(samples[math.ceil(.95*len(samples))-1],2),'iterations':len(samples),'synthetic':True}
-print(json.dumps({'results':len(s['results']),'identity_consistent':True,'destination_choices':len(r['choices']),'exact_percentile':terminal['reason'],'consumed_job':410,'native_http_fixture_benchmarks':bench},indent=2))
+print(json.dumps({'results':len(s['results']),'identity_consistent':True,'destination_choices':len(r['choices']),'native_http_fixture_benchmarks':bench},indent=2))

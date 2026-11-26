@@ -28,9 +28,6 @@ test('hard unknown passes with note; hide removes; soft unknown scores 50', () =
   assert.deepEqual(filterListing({ ...listing, bedrooms: null }, i), { passes: true, notes: ['bedrooms: not confirmed'] });
   assert.equal(filterListing({ ...listing, bedrooms: null }, i, {}, true).passes, false);
   assert.equal(filterListing({ ...listing, bedrooms: 1 }, i).passes, false);
-  const fair = intent({ priceFairness: { value: ['underpriced'], hard: true } });
-  assert.equal(filterListing(listing, fair, context).passes, true);
-  assert.equal(filterListing(listing, fair, { valuation: valuations[2] }).passes, false);
   assert.equal(homeFit({ ...listing, bedrooms: null }, intent({ bedrooms: { value: { min: 2 }, hard: false } })), 50);
   const ac = intent({ airConditioning: { value: 'any', hard: true }, laundryInSuite: { value: true, hard: false } });
   assert.deepEqual(filterListing({ ...listing, airConditioning: 'unknown', laundryInSuite: 'unknown' }, ac), { passes: true, notes: ['airConditioning: not confirmed'] });
@@ -61,11 +58,11 @@ test('alternative modes OR, destinations AND, estimated time confirms against it
   assert.equal(evaluateTarget({ ...target, alternativeModes: undefined, maxMinutes: 40, mode: 'walk' }, [{ ...row('walk', null), distanceM: 1600 }]).score, 100);
 });
 test('five parts, exact value/price formulas, renormalization, safety off', () => {
-  const i = intent({ rent: { value: { min: 2000, max: 2000 }, hard: false }, priceFairness: { value: ['underpriced'], hard: false } });
+  const i = intent({ rent: { value: { min: 2000, max: 2000 }, hard: false } });
   const score = scoreListing({ ...listing, monthlyRentCad: 2150 }, i, { ...context, valuation: valuations[0] });
   assert.equal(score.parts.find(p => p.id === 'price')!.score, 50);
   assert.equal(score.parts.find(p => p.id === 'value')!.score, 87.5);
-  assert.equal(score.parts.find(p => p.id === 'value')!.weight, 45);
+  assert.equal(score.parts.find(p => p.id === 'value')!.weight, 30);
   assert.ok(score.parts.find(p => p.id === 'price')!.evidence[0].includes('2150'));
   assert.ok(score.parts.find(p => p.id === 'value')!.evidence[0].includes('15% below'));
   MatchScoreSchema.parse(score);
@@ -146,9 +143,8 @@ test('Rent verification threshold keeps a neutral value without dropping the cav
     assert.equal(score.total, Math.round(score.parts.reduce((sum, p) => sum + (p.score ?? 0) * p.effectiveWeight, 0)));
   }
 });
-test('scoreWeights: defaults, a good-deal or safety opt-in, then the renter\'s sliders; safety stays 0 when off', () => {
+test('scoreWeights: defaults, safety opt-in, then the renter\'s sliders; safety stays 0 when off', () => {
   assert.deepEqual(scoreWeights(baseIntent), { value: 30, price: 15, travel: 30, home: 25, safety: 0 });
-  assert.equal(scoreWeights(intent({ priceFairness: { value: ['underpriced'], hard: false } })).value, 45);
   assert.equal(scoreWeights({ ...baseIntent, safety: { enabled: true, hard: false } }).safety, 15);
   const own = { value: 10, price: 0, travel: 80, home: 10, safety: 50 };
   assert.deepEqual(scoreWeights({ ...baseIntent, weights: own }), { ...own, safety: 0 });
