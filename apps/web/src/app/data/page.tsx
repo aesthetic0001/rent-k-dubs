@@ -211,12 +211,11 @@ export default async function DataPage() {
         <p>{d("score.intro")}</p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            {d("score.parts.value", { weight: w.value, fairness: engineConfig.fairnessWeight })}
+            {d("score.parts.value", { weight: w.value })}
           </li>
           <li>{d("score.parts.price", { weight: w.price })}</li>
           <li>{d("score.parts.travel", { weight: w.travel })}</li>
           <li>{d("score.parts.home", { weight: w.home })}</li>
-          <li>{d("score.parts.safety", { weight: engineConfig.safetyWeight })}</li>
         </ul>
         <Rules list={en.dataPage.score.rules} prefix="score.rules" />
       </Section>
@@ -243,6 +242,7 @@ export default async function DataPage() {
 
       <Section id="safety">
         <p>{d("safety.body")}</p>
+        <p><a className="underline" href="https://wrps.ca/front-page/statistics-and-data">Waterloo Regional Police statistics and data</a></p>
       </Section>
 
       <Section id="ai">

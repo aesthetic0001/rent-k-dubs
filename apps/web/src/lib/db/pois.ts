@@ -58,7 +58,7 @@ export const poiBatchStatement = `
   FROM unnest($1::float8[], $2::float8[]) WITH ORDINALITY AS o(lng, lat, idx)
   CROSS JOIN LATERAL (
     SELECT location FROM pois
-    WHERE category = $3
+    WHERE category = $3 AND ($4::text = '' OR subcategory = $4)
     ORDER BY location <-> ST_SetSRID(ST_MakePoint(o.lng, o.lat), 4326)::geography
     LIMIT 1
   ) p
@@ -99,12 +99,19 @@ export function amenityDistances(client: () => Client | null = getClient, now: (
       const computedAt = now().toISOString();
       const lngs = listings.map((listing) => listing.location.lng);
       const lats = listings.map((listing) => listing.location.lat);
-      const byCategory = new Map<AmenityCategory, TravelTarget[]>();
-      for (const target of amenities) byCategory.set(target.category!, [...(byCategory.get(target.category!) ?? []), target]);
+      const byCategory = new Map<string, { category: AmenityCategory; subtype: string; categoryTargets: TravelTarget[] }>();
+      for (const target of amenities) {
+        const category = target.category!;
+        const subtype = category === "school" && target.schoolLevel !== "any" ? target.schoolLevel ?? "" : "";
+        const key = category + ":" + subtype;
+        const group = byCategory.get(key);
+        if (group) group.categoryTargets.push(target);
+        else byCategory.set(key, { category, subtype, categoryTargets: [target] });
+      }
 
-      const groups = await Promise.all([...byCategory].map(async ([category, categoryTargets]) => {
+      const groups = await Promise.all([...byCategory.values()].map(async ({ category, subtype, categoryTargets }) => {
         const rows = isPoiCategory(category)
-          ? await sql.unsafe(poiBatchStatement, [lngs, lats, category])
+          ? await sql.unsafe(poiBatchStatement, [lngs, lats, category, subtype])
           : await sql.unsafe(rapidTransitBatchStatement, [lngs, lats]);
         const spots = new Map<number, Spot>();
         for (const row of z.array(batchRowSchema).parse(rows)) spots.set(row.idx, { lat: row.lat, lng: row.lng });

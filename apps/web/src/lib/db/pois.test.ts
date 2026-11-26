@@ -73,6 +73,21 @@ test("rapid transit is batched from GTFS stops and a missing database fills noth
   assert.deepEqual(await amenityDistances(() => null)([sampleListings[0]], [target]), [], "no database means no rows");
 });
 
+test("school levels batch separately while an unrestricted school still uses the whole category", async () => {
+  const subtypes: SqlParameter[] = [];
+  const fill = amenityDistances(() => ({ unsafe: async (statement, params) => {
+    assert.equal(statement, poiBatchStatement);
+    subtypes.push(params[3]);
+    return [{ idx: 1, lat: 43.64, lng: -79.43 }];
+  } }));
+  const targets = (["elementary", "secondary", "any"] as const).map(schoolLevel => ({
+    id: schoolLevel, schoolLevel, kind: "amenity" as const, label: "School", category: "school" as const, mode: "walk" as const, hard: true,
+  }));
+  const rows = await fill([sampleListings[0]], targets);
+  assert.deepEqual(subtypes, ["elementary", "secondary", ""]);
+  assert.deepEqual(rows.map(row => row.targetId), ["elementary", "secondary", "any"]);
+});
+
 test("a missing category, empty table or broken database means no amenity", async () => {
   assert.equal(await nearestAmenity(() => null)({ lat: 43.6, lng: -79.4 }, "grocery"), null);
   const { client } = recorder([]);

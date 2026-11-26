@@ -19,7 +19,6 @@ import {
   SquareParking,
   Tag,
   Trash2,
-  TrendingDown,
   Users,
   WashingMachine,
   Zap,
@@ -58,7 +57,6 @@ const SUMMARY_CHIPS = 3;
 /** An icon per kind of chip, so a row of filters can be scanned by shape as well as words. */
 const criterionIcons: Record<NonNullable<Chip["field"]>, LucideIcon> = {
   rent: DollarSign,
-  priceFairness: Tag,
   bedrooms: BedDouble,
   bathrooms: Bath,
   sizeSqft: Ruler,
@@ -90,8 +88,6 @@ function chipIconType(chip: Chip, intent: SearchIntent): LucideIcon {
       return Users;
     case "sort":
       return ArrowUpDown;
-    case "extreme":
-      return TrendingDown;
   }
 }
 

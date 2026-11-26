@@ -1,7 +1,7 @@
 // The nearest place behind a result's trip line ("Est. 2 min walk to groceries"): hovering the line
 // pins that grocery store (or park, pharmacy, stop…) on the map. The place comes from the listing's
 // nearby lookup (/api/listings/[id]/nearby), the same nearest-first list the listing page shows,
-// fetched once per listing and kept for the visit.
+// cached per listing and school level for the visit.
 import { create } from "zustand";
 import { fetchNearby } from "@/lib/store/actions";
 import type { SearchIntent } from "@/lib/store/types";
@@ -20,8 +20,8 @@ export const useAmenityPin = create<{ pin: AmenityPin | null }>(() => ({ pin: nu
 
 const nearby = new Map<string, ReturnType<typeof fetchNearby>>();
 
-/** Which listing the pointer is on now, so a slow lookup can't pin after it has left. */
-let pointedAt: string | null = null;
+/** Only the latest hovered trip may update the pin. */
+let pointedAt: symbol | null = null;
 
 export interface NearestPlace {
   name: string;
@@ -35,14 +35,16 @@ export interface NearestPlace {
  */
 export async function nearestPlace(listingId: string, target: Target | undefined) {
   if (target?.kind !== "amenity" || !target.category) return null;
-  let lookup = nearby.get(listingId);
+  const schoolLevel = target.category === "school" && target.schoolLevel !== "any" ? target.schoolLevel : undefined;
+  const key = schoolLevel ? `${listingId}:${schoolLevel}` : listingId;
+  let lookup = nearby.get(key);
   if (!lookup) {
-    lookup = fetchNearby(listingId);
-    nearby.set(listingId, lookup);
+    lookup = fetchNearby(listingId, { schoolLevel });
+    nearby.set(key, lookup);
   }
   const result = await lookup;
   if (!result.ok) {
-    nearby.delete(listingId);
+    nearby.delete(key);
     return null;
   }
   const places = result.nearby;
@@ -60,9 +62,10 @@ export async function showNearestAmenity(
   listing: { id: string; location: { lng: number; lat: number } },
   target: Target | undefined,
 ): Promise<void> {
-  pointedAt = listing.id;
+  const hover = Symbol();
+  pointedAt = hover;
   const place = await nearestPlace(listing.id, target);
-  if (!place || pointedAt !== listing.id) return;
+  if (!place || pointedAt !== hover) return;
   useAmenityPin.setState({ pin: { listingId: listing.id, from: listing.location, ...place } });
 }
 

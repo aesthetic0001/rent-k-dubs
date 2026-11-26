@@ -12,21 +12,39 @@ import { placeCatalogueVersion } from './place-catalogue';
 import { MemoryCache, IpLimiter, inputHash, type Cache } from './cache';
 import { possibleIntersections } from './intersections';
 import { namedParkMentions } from './named-parks';
+import { localIntent, type LocalExtractor } from './local-extractor';
+import type { PoiClient } from '../geo/poi-client';
 export { fallbackParse, configuredAreas } from './fallback';
 export { DestinationResolver } from './resolve';
 export { IpLimiter, RateLimitError, MemoryCache } from './cache';
 export class ParseService {
   private cache: Cache<ParseResponse>;
-  constructor(private options: { provider?: AIProvider; resolver?: DestinationResolver; cache?: Cache<ParseResponse>; limiter?: IpLimiter; now?: () => Date; intentCache?: IntentCache; cacheNamespace?: string; civicAreas?: () => Promise<CivicArea[]> } = {}) { this.cache = options.cache ?? new MemoryCache<ParseResponse>(); }
+  constructor(private options: { provider?: AIProvider; extractor?: LocalExtractor; resolver?: DestinationResolver; cache?: Cache<ParseResponse>; limiter?: IpLimiter; now?: () => Date; intentCache?: IntentCache; cacheNamespace?: string; civicAreas?: () => Promise<CivicArea[]>; poiMentions?: PoiClient['mentions'] } = {}) { this.cache = options.cache ?? new MemoryCache<ParseResponse>(); }
   async parse(input: unknown, trustedIp: string): Promise<ParseResponse> {
     const { prompt } = ParseRequestSchema.parse(input);
     this.options.limiter?.check(trustedIp);
     const catalogue = await this.options.civicAreas?.() ?? [];
-    const key = inputHash(`parse-v3:${this.options.cacheNamespace ?? "default"}:${inputHash(parseInstruction + JSON.stringify(configuredAreas) + JSON.stringify(catalogue) + placeCatalogueVersion)}:${(this.options.now?.() ?? new Date()).toISOString().slice(0, 10)}:${prompt}`);
+    const key = inputHash(`parse-v9:${this.options.cacheNamespace ?? "default"}:${inputHash(parseInstruction + JSON.stringify(configuredAreas) + JSON.stringify(catalogue) + placeCatalogueVersion)}:${(this.options.now?.() ?? new Date()).toISOString().slice(0, 10)}:${prompt}`);
     const cached = this.cache.get(key); if (cached) return cached;
+    const places = await this.options.poiMentions?.(prompt) ?? [];
+    const basicIntent = () => fallbackParse(prompt, this.options.now?.(), catalogue, undefined, places);
     let intent: SearchIntent; let parser: ParseResponse['parser'] = 'fallback'; let notice: string | undefined = this.options.civicAreas && !catalogue.length ? 'Official area catalogue unavailable; review area filters.' : undefined;
-    const stored = await this.options.intentCache?.get(key, prompt);
-    if (stored) { intent = stored; parser = 'gemini'; } else {
+    const stored = this.options.extractor ? undefined : await this.options.intentCache?.get(key, prompt);
+    if (this.options.extractor) {
+      const now = this.options.now?.();
+      const basic = basicIntent();
+      try {
+        // An explicit rule-based value already resolves the closed choice. Keep both ends of numeric ranges open to extraction.
+        const covered = Object.keys(basic.criteria).filter(field => !['rent', 'bedrooms', 'bathrooms', 'sizeSqft'].includes(field));
+        if (basic.sortBy !== 'best_match') covered.push('sort');
+        const evidence = await this.options.extractor(prompt, covered, places);
+        intent = localIntent(prompt, evidence, catalogue, now, places);
+        parser = 'gliner';
+      } catch {
+        intent = basic;
+        notice = [notice, 'Local extraction unavailable. Review filters from the basic parser.'].filter(Boolean).join(' ');
+      }
+    } else if (stored) { intent = stored; parser = 'gemini'; } else {
       // Rejection steps are logged without prompt content so a failed interpretation is diagnosable.
       const reject = (step: string) => { console.warn('[search.parse] AI interpretation rejected', { step }); return new AIUnavailable('invalid'); };
       try {
@@ -34,9 +52,9 @@ export class ParseService {
         intent = SearchIntentSchema.parse(cleanAIIntent(intent, prompt, catalogue));
         // Nothing survived the evidence check: the model added no grounded constraint, so the
         // deterministic interpretation is the honest answer (and says AI wasn't used).
-        const grounded = intent.travelTargets.length + Object.keys(intent.criteria).length + intent.areas.length + (intent.household ? 1 : 0) + (intent.numericExtreme ? 1 : 0) + (intent.safety.enabled ? 1 : 0) + (intent.sortBy !== 'best_match' ? 1 : 0);
+        const grounded = intent.travelTargets.length + Object.keys(intent.criteria).length + intent.areas.length + (intent.household ? 1 : 0) + (intent.safety.enabled ? 1 : 0) + (intent.sortBy !== 'best_match' ? 1 : 0);
         if (!grounded) throw reject('no_grounded_interpretation');
-        const basic = fallbackParse(prompt, this.options.now?.(), catalogue);
+        const basic = basicIntent();
         // A named park the model dropped would turn "near High Park" into any listing in the city.
         if (namedParkMentions(prompt).some(park => !intent.travelTargets.some(target => target.kind === 'place' && target.query?.toLowerCase().includes(park.phrase.toLowerCase())))) throw reject('named_park');
         if (basic.droppedRequests.some(request => request.reason === 'Area name is ambiguous.')) throw reject('ambiguous_area');
@@ -75,7 +93,7 @@ export class ParseService {
           reason: error instanceof AIUnavailable ? error.reason : error instanceof z.ZodError ? 'schema_validation' : 'parse_validation',
           status: error instanceof AIUnavailable && error.reason === 'busy' ? error.status : undefined,
         });
-        intent = fallbackParse(prompt, this.options.now?.(), catalogue);
+        intent = basicIntent();
         notice = [notice, error instanceof AIUnavailable && error.reason === 'busy' ? 'AI busy, used basic search.' : 'Used basic search; review the interpreted filters.'].filter(Boolean).join(' ');
       }
       if (parser === 'gemini') await this.options.intentCache?.set(key, prompt, intent);
@@ -99,7 +117,7 @@ export class ParseService {
     }
     const result = ParseResponseSchema.parse({ intent, destinations, parser, ...(notice ? { notice } : {}) });
     // Only successful AI interpretations are cached; temporary failures must be able to recover immediately.
-    if (parser === 'gemini') this.cache.set(key, result);
+    if (parser !== 'fallback') this.cache.set(key, result);
     return result;
   }
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { distanceM } from "@rentkdubs/shared/engine/travel";
+import type { PoiClient } from "./poi-client";
 
 /**
  * GET /api/places/search?q=walmart&near=lat,lng: named places around Waterloo ("Walmart",
@@ -74,11 +75,22 @@ export function placesFromPhoton(body: unknown, near: { lat: number; lng: number
   return places.sort((a, b) => a.distanceM - b.distanceM).slice(0, MAX_RESULTS);
 }
 
-export function createPlaceSearchHandler(fetchImpl: typeof fetch = fetch) {
+export function createPlaceSearchHandler(fetchImpl: typeof fetch = fetch, poiLookup?: PoiClient["resolve"]) {
   return async (request: Request): Promise<Response> => {
     const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) return Response.json({ error: "invalid_request" }, { status: 400 });
     const { q, near } = parsed.data;
+    const local = await poiLookup?.(q, request.signal, false, near);
+    if (local) {
+      const choices = local.status === "resolved" ? [local.destination] : local.choices;
+      const places: FoundPlace[] = choices.map(({ label, resolved: location }) => ({
+        name: label,
+        address: null,
+        distanceM: distanceM(near, location),
+        location: { lng: location.lng, lat: location.lat },
+      }));
+      return Response.json({ places: places.sort((a, b) => a.distanceM - b.distanceM) });
+    }
     const url = new URL(PHOTON_URL);
     url.search = new URLSearchParams({
       q,

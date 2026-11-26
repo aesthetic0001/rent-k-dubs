@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { baseIntent, sampleListings, valuations, travelIntent, safetySearchFixture } from '../../../../../packages/shared/fixtures/index';
 import type { Listing, TravelTimeRow } from '../../../../../packages/shared/schemas/index';
-import { mapCandidatePool, searchCandidates, SearchUnavailable, type SearchDependencies } from './candidates';
+import { mapCandidatePool, searchCandidates, type SearchDependencies } from './candidates';
 const enrich: SearchDependencies['enrich'] = async () => ({ valuation: valuations[3], travel: [], safety: null });
 const pool: Listing[] = Array.from({ length: 520 }, (_, i) => ({ ...sampleListings[1], id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, monthlyRentCad: 1000 + 520 - i }));
 const request = { intent: { ...baseIntent, sortBy: 'lowest_rent' as const }, hideUnconfirmed: false };
@@ -30,7 +30,12 @@ test('full pool numeric order precedes cap; cheap filters precede enrichment', a
   calls = 0;
   await searchCandidates({ ...request, intent: { ...request.intent, criteria: { rent: { value: { max: 1002 }, hard: true } } } }, { listings: pool, enrich: async (...args) => { calls++; return enrich(...args); } });
   assert.equal(calls, 2);
-  await assert.rejects(searchCandidates({ ...request, intent: { ...request.intent, sortBy: 'lowest_true_cost' } }, { listings: pool, enrich }), SearchUnavailable);
+});
+test('total monthly cost falls back to listed rent with a notice', async () => {
+  const result = await searchCandidates({ ...request, intent: { ...request.intent, sortBy: 'lowest_true_cost' } }, { listings: pool, enrich });
+  assert.equal(result.eligibleCount, 520);
+  assert.equal(result.results[0].listing.monthlyRentCad, 1001);
+  assert.deepEqual(result.notices, ['Total monthly costs are unavailable. Showing lowest listed rent first.']);
 });
 test('distance decides the hard travel gate; routing still covers only the top100', async () => {
   let routed = 0;
@@ -200,10 +205,10 @@ test('eligibility context filters full pool before500 while bounding valuation a
   assert.equal(valuationsCalled, 500); assert.equal(unresolved.results.length, 0);
 });
 
-test('valuation ordering/fairness retain full contexts and cross-listing eligibility travel cannot confirm', async () => {
+test('valuation and travel ordering retain full contexts and cross-listing eligibility travel cannot confirm', async () => {
   let full = 0, cheap = 0;
   const deps: SearchDependencies = { listings: pool, filterContext: async () => { cheap++; return {}; }, enrich: async (...args) => { full++; return enrich(...args); } };
-  for (const intent of [{ ...travelIntent, sortBy: 'best_value' as const }, { ...travelIntent, sortBy: 'shortest_trips' as const }, { ...travelIntent, criteria: { priceFairness: { hard: true, value: ['underpriced' as const] } } }]) {
+  for (const intent of [{ ...travelIntent, sortBy: 'best_value' as const }, { ...travelIntent, sortBy: 'shortest_trips' as const }]) {
     full = cheap = 0;
     await searchCandidates({ intent, hideUnconfirmed: false }, deps);
     assert.equal(full, 520); assert.equal(cheap, 0);

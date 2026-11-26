@@ -1,7 +1,6 @@
 // B-owned scoring and ordinary-search tunables; surface on A's /data page at integration.
 export const engineConfig = {
   weights: { value: 30, price: 15, travel: 30, home: 25, safety: 0 },
-  fairnessWeight: 45,
   safetyWeight: 15,
   priceOverrun: 0.15,
   sizeOverrun: 0.25,
@@ -10,7 +9,6 @@ export const engineConfig = {
   candidateLimit: 500,
   routingLimit: 100,
   routingBudgetMs: 3000,
-  percentileBudgetMs: 120000,
   // Heuristic speeds, route detours and access/wait/parking overhead; not calibrated route times.
   travelEstimate: {
     walk: { speedKmh: 4.8, routeFactor: 1.25, overheadMinutes: 0 },

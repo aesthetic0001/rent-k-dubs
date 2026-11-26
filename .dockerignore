@@ -29,6 +29,7 @@ coverage
 otp/data
 otp/graphs
 db/snapshots
+local/
 apps/worker/fixtures/raw
 apps/worker/.cache
 *.osm.pbf

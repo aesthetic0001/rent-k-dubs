@@ -25,7 +25,7 @@ function pack(prompt: string, input: SearchIntent) {
     return [start, start + text.length];
   };
   const sources: Record<string, z.infer<typeof span>> = {};
-  const allowed = new Set(['areas', 'safety', 'sortBy', 'numericExtreme', ...Object.keys(intent.criteria).map(k => `criteria.${k}`), ...Object.keys(intent.household ?? {}).map(k => `household.${k}`), ...intent.travelTargets.map(t => `travelTargets.${t.id}`)]);
+  const allowed = new Set(['areas', 'safety', 'sortBy', ...Object.keys(intent.criteria).map(k => `criteria.${k}`), ...Object.keys(intent.household ?? {}).map(k => `household.${k}`), ...intent.travelTargets.map(t => `travelTargets.${t.id}`)]);
   for (const [key, source] of Object.entries(intent.fieldSources)) {
     if (!allowed.has(key) || source.source !== 'ai_prompt' || !source.phrase) return;
     sources[key] = locate(source.phrase);

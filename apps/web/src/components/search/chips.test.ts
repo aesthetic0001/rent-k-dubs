@@ -17,7 +17,6 @@ const intent: SearchIntent = SearchIntentSchema.parse({
   rawPrompt: "2-bedroom near UofT St. George under $2,800 …",
   criteria: {
     rent: { value: { max: 2800 }, hard: true },
-    priceFairness: { value: ["underpriced", "reasonable"], hard: false },
     bedrooms: { value: { min: 2, max: 2 }, hard: true },
     buildingAge: { value: { builtAfter: 2005 }, hard: false },
     airConditioning: { value: "any", hard: false },
@@ -68,7 +67,6 @@ describe("buildChips", () => {
   it("labels every criterion in plain language", () => {
     expect(chips.map((c) => c.label)).toEqual([
       "Up to $2,800",
-      "Underpriced or Reasonably priced",
       "2 bedrooms",
       "Built after 2005",
       "Air conditioning",
@@ -186,20 +184,6 @@ describe("chip edits", () => {
     expect(next.weights?.safety).toBe(0);
   });
 
-  it("removing a travel target drops a percentile that depended on it", () => {
-    const withExtreme = valid({
-      ...intent,
-      numericExtreme: {
-        field: "travel",
-        direction: "min",
-        percentage: 10,
-        minimumCount: 10,
-        targetId: "uoft",
-      },
-    });
-    const next = valid(removeChip(withExtreme, chip("travelTargets.uoft")));
-    expect(next.numericExtreme).toBeUndefined();
-  });
 
   it("changes travel modes, keeping the primary mode when it stays chosen", () => {
     const bike = valid(setTargetModes(intent, "grocery", ["bike"]));

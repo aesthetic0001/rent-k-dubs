@@ -99,9 +99,13 @@ export async function fillDistanceRows(
   });
 }
 export async function searchCandidates(input: SearchRequest, dependencies: SearchDependencies) {
-  const request = SearchRequestSchema.parse(input), { intent } = request;
-  if (intent.numericExtreme) throw new SearchUnavailable('Percentile selection requires the full-pool percentile pipeline');
-  if (intent.sortBy === 'lowest_true_cost') throw new SearchUnavailable('True monthly cost requires D-owned affordability data');
+  const request = SearchRequestSchema.parse(input);
+  const notices: string[] = [];
+  if (request.intent.sortBy === 'lowest_true_cost') {
+    request.intent = { ...request.intent, sortBy: 'lowest_rent' };
+    notices.push('Total monthly costs are unavailable. Showing lowest listed rent first.');
+  }
+  const { intent } = request;
   const source = dependencies.loadCandidates ? await dependencies.loadCandidates(request) : dependencies.listings;
   // The SQL loader has already validated its rows with ListingSchema; fixtures are typed. Parsing
   // the whole pool again here doubled the cost of the largest read for no extra safety.
@@ -113,7 +117,7 @@ export async function searchCandidates(input: SearchRequest, dependencies: Searc
   const contexts = new Map<string, ScoreContext>();
   const filterContexts = new Map<string, FilterContext>();
   const hardContextGate = intent.safety.enabled && intent.safety.hard || intent.travelTargets.some(t => t.hard);
-  const fullContextRequired = intent.sortBy === 'best_value' || intent.sortBy === 'shortest_trips' || intent.criteria.priceFairness?.hard || hardContextGate && !dependencies.filterContext;
+  const fullContextRequired = intent.sortBy === 'best_value' || intent.sortBy === 'shortest_trips' || hardContextGate && !dependencies.filterContext;
   let eligiblePool = pool;
   if (hardContextGate && !fullContextRequired && dependencies.filterContext) {
     const filtered = await mapCandidatePool(pool, async listing => {
@@ -170,7 +174,7 @@ export async function searchCandidates(input: SearchRequest, dependencies: Searc
     return [SearchResultSchema.parse({ ...result, travel: context.travel, matchScore: scoreListing(result.listing, intent, context) })];
   }).sort((a, b) => compareResults(intent, a, b));
   const eligibleCount = fullContextRequired || filterContexts.size ? pool.filter(listing => filterListing(listing, intent, contexts.get(listing.id) ?? filterContexts.get(listing.id), request.hideUnconfirmed).passes).length : pool.length - (candidates.length - results.length);
-  return { results, eligibleCount, notices: [] };
+  return { results, eligibleCount, notices };
 }
 
 /**

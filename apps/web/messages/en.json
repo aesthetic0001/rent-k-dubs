@@ -223,11 +223,6 @@
       "rentMax": "Up to {max}",
       "rentMin": "From {min}",
       "rentRange": "{min}–{max}",
-      "fairness": {
-        "underpriced": "Underpriced",
-        "reasonable": "Reasonably priced",
-        "overpriced": "Overpriced"
-      },
       "studio": "Studio",
       "bedroomsOne": "1 bedroom",
       "bedroomsExact": "{n} bedrooms",
@@ -288,19 +283,6 @@
         "closest_area": "closest to my area",
         "lowest_carbon": "lowest-carbon trips"
       },
-      "extreme": "{direction} {percentage}% by {field}",
-      "directions": {
-        "min": "Lowest",
-        "max": "Highest"
-      },
-      "extremeFields": {
-        "rent": "rent",
-        "bedrooms": "bedrooms",
-        "bathrooms": "bathrooms",
-        "sizeSqft": "size",
-        "buildingAge": "building age",
-        "travel": "distance"
-      },
       "safetyMax": "Crime at most {rate}× city rate"
     },
     "panel": {
@@ -328,8 +310,6 @@
       "yes": "Yes",
       "no": "No",
       "rent": "Rent per month",
-      "priceFairness": "Price compared with similar listings",
-      "priceFairnessHelp": "Compared with asking rents for similar listings nearby, not signed leases.",
       "bedrooms": "Bedrooms",
       "bedroomsHelp": "0 means a studio.",
       "bathrooms": "Bathrooms",
@@ -446,7 +426,6 @@
       "utilities": "Utilities",
       "availableBy": "Available by",
       "lease": "Lease",
-      "priceFairness": "Price compared with similar listings",
       "safety": "Reported crime levels"
     },
     "approx": "Approximate location",
@@ -669,6 +648,16 @@
       "chipRadius": "within {km} km",
       "chipDays": "last {days} days"
     },
+    "monthly": {
+      "title": "Monthly cost",
+      "rent": "Asking rent",
+      "roomRent": "Asking rent per room",
+      "transit": "GRT transit",
+      "total": "Rent and transit per month",
+      "hasUPass": "I have a U-Pass",
+      "uPassNote": "Eligible UW, Laurier and Conestoga students pay for the U-Pass through student fees.",
+      "scope": "Utilities and other expenses are excluded."
+    },
     "fields": {
       "bedrooms": "Bedrooms",
       "bathrooms": "Bathrooms",
@@ -767,10 +756,13 @@
       "median_asking_rent_2br": "Typical asking rent here, 2 bedrooms",
       "median_asking_rent_3br": "Typical asking rent here, 3+ bedrooms",
       "listing_count_30d": "Listings seen here in the last 30 days",
+      "renter_households": "Number of renter households",
       "renter_households_pct": "Renter households",
-      "renters_shelter_cost_30pct": "Renters spending 30%+ of income on shelter",
+      "renters_shelter_cost_30pct": "Renters spending 30%+ of income on shelter (estimate)",
+      "private_dwellings": "Private dwellings",
+      "occupied_private_dwellings": "Occupied private dwellings",
       "median_household_income": "Median household income",
-      "dev_applications_12m": "Development applications in the last 12 months",
+      "dev_applications_under_review": "Mapped major developments under review",
       "residential_units_proposed_12m": "Homes proposed in the last 12 months",
       "transit_stops_per_km2": "Transit stops per km²",
       "rapid_transit_within_800m_pct": "Area within 800 m of rapid transit",
@@ -888,14 +880,17 @@
       "median_asking_rent_2br": "Typical asking rent, 2 bedrooms",
       "median_asking_rent_3br": "Typical asking rent, 3 bedrooms",
       "listing_count_30d": "Listings collected",
+      "renter_households": "Number of renter households",
       "renter_households_pct": "Households that rent",
-      "renters_shelter_cost_30pct": "Renters spending 30% or more of income on shelter",
+      "renters_shelter_cost_30pct": "Renters spending 30% or more of income on shelter (estimate)",
+      "private_dwellings": "Private dwellings",
+      "occupied_private_dwellings": "Occupied private dwellings",
       "median_household_income": "Median household income (2020)",
       "transit_stops_per_km2": "Transit stops per km²",
       "rapid_transit_within_800m_pct": "Area within 800 m of an ION or rail stop",
       "libraries": "Public libraries",
       "parks": "Parks",
-      "dev_applications_12m": "Development applications",
+      "dev_applications_under_review": "Major developments under review",
       "residential_units_proposed_12m": "Homes proposed in rezoning applications"
     }
   },
@@ -1002,7 +997,7 @@
     "score": {
       "intro": "Listings that fail one of your must-haves are left out. The rest get a match score from 0 to 100, made of five parts:",
       "parts": {
-        "value": "Value ({weight}%, or {fairness}% if you ask for a good deal): the rent against our estimate.",
+        "value": "Value ({weight}%): the rent against our estimate.",
         "price": "Price ({weight}%): how the rent sits against your budget, when the budget is a preference.",
         "travel": "Travel ({weight}%): time to your places against your target.",
         "home": "Home ({weight}%): how the unit matches your wishes: bedrooms, size, AC, laundry, pets and so on.",
@@ -1021,7 +1016,7 @@
       "modeNoOverhead": "{mode}: {speed} km/h along streets about {detour}× the straight-line distance"
     },
     "safety": {
-      "body": "Reported crime levels are off unless you turn them on. They use police-reported rates for five major crime types in the listing's neighbourhood, compared with the city average. Reported crime isn't all crime, rates move from year to year, and they say nothing about any street or building. We never call an area safe or unsafe."
+      "body": "Neighbourhood safety scoring is unavailable in Waterloo. Waterloo Regional Police publish calls for service with locations approximated to nearby intersections. These data cannot support a reliable neighbourhood crime rate."
     },
     "ai": {
       "rules": {

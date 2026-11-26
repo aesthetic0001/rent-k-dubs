@@ -1,4 +1,4 @@
-import type { Listing, SearchIntent, Valuation, TravelTimeRow, Safety, MatchScore, Caveat, NumericExtreme } from '../schemas/index';
+import type { Listing, SearchIntent, Valuation, TravelTimeRow, Safety, MatchScore, Caveat } from '../schemas/index';
 import { CAVEATS, engineConfig } from './config';
 import { filterListing } from './filters';
 import { homeFit, homeCriteria } from './home-fit';
@@ -11,9 +11,9 @@ export function valueScore(valuation: Pick<Valuation, 'status' | 'differencePct'
   if (valuation.differencePct > CAVEATS.farBelowPct) return 50;
   return clamp(50 + valuation.differencePct * 2.5);
 }
-/** The part weights a search scores with: the defaults, a "good deal" or safety opt-in, then the renter's own sliders. */
+/** The part weights a search scores with: the defaults, safety opt-in, then the renter's own sliders. */
 export function scoreWeights(intent: SearchIntent): Record<keyof typeof engineConfig.weights, number> {
-  const weights = { ...engineConfig.weights, ...(intent.criteria.priceFairness && !intent.criteria.priceFairness.hard ? { value: engineConfig.fairnessWeight } : {}), ...(intent.safety.enabled ? { safety: engineConfig.safetyWeight } : {}), ...intent.weights };
+  const weights = { ...engineConfig.weights, ...(intent.safety.enabled ? { safety: engineConfig.safetyWeight } : {}), ...intent.weights };
   if (!intent.safety.enabled) weights.safety = 0;
   return weights;
 }
@@ -57,12 +57,4 @@ export function tieBreak(a: TieSide, b: TieSide): number {
 /** Best match: fewer unconfirmed must-haves, then the score, then tieBreak. A negative result sorts `a` first. */
 export function bestMatchOrder(a: { total: number; unconfirmed: number; tie: TieSide }, b: { total: number; unconfirmed: number; tie: TieSide }): number {
   return a.unconfirmed - b.unconfirmed || b.total - a.total || tieBreak(a.tie, b.tie);
-}
-export function selectPercentile(listings: readonly Listing[], selector: NumericExtreme, referenceYear: number, travelMetres: (listing: Listing) => number | null = () => null): Listing[] {
-  if (!Number.isInteger(referenceYear)) throw new Error('A reference year is required for building ages');
-  const known = listings.flatMap(listing => {
-    const value = selector.field === 'rent' ? listing.monthlyRentCad : selector.field === 'sizeSqft' ? listing.sqft : selector.field === 'buildingAge' ? listing.yearBuilt === null ? null : referenceYear - listing.yearBuilt : selector.field === 'travel' ? travelMetres(listing) : listing[selector.field];
-    return value === null || !Number.isFinite(value) ? [] : [{ listing, value }];
-  }).sort((a, b) => (selector.direction === 'min' ? a.value - b.value : b.value - a.value) || tieBreak({ listing: a.listing }, { listing: b.listing }));
-  return known.slice(0, Math.min(known.length, Math.max(selector.minimumCount ?? 10, Math.ceil(known.length * selector.percentage / 100)))).map(row => row.listing);
 }

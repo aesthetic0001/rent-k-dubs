@@ -10,6 +10,7 @@ import {
 } from "@rentkdubs/shared/schemas";
 import { z } from "zod";
 import { appStore, type createAppStore } from "./store";
+import { withoutNeighbourhoodSafety } from "../parse/market-safety";
 import { needsReinterpretation } from "./persist";
 import type {
   ApiError,
@@ -29,7 +30,7 @@ type Store = ReturnType<typeof createAppStore>;
 export type ActionOptions = {
   store?: Store;
   fetch?: typeof fetch;
-  /** How often to poll a pending search (B's travel-percentile jobs). */
+  /** How often to poll a pending search. */
   pollIntervalMs?: number;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -233,8 +234,9 @@ export async function restoreSearch(
   options: ActionOptions = {},
 ): Promise<void> {
   const store = options.store ?? appStore;
-  store.getState().loadSearch(search.intent, search.hideUnconfirmed);
-  if (needsReinterpretation(search.intent)) return parseAndSearch(search.intent.rawPrompt, options);
+  const intent = withoutNeighbourhoodSafety(search.intent);
+  store.getState().loadSearch(intent, search.hideUnconfirmed);
+  if (needsReinterpretation(intent)) return parseAndSearch(intent.rawPrompt, options);
   await runSearch(options);
 }
 
@@ -319,11 +321,12 @@ export async function fetchChoropleth(
 /** D's nearest places by category and nearest TTC stops for one listing (straight-line, P2.16). */
 export async function fetchNearby(
   id: string,
-  options: Pick<ActionOptions, "fetch"> & { signal?: AbortSignal } = {},
+  options: Pick<ActionOptions, "fetch"> & { signal?: AbortSignal; schoolLevel?: "elementary" | "secondary" } = {},
 ): Promise<{ ok: true; nearby: NearbyResponse } | { ok: false; error: ApiError }> {
+  const query = options.schoolLevel ? `?categories=school&schoolLevel=${options.schoolLevel}` : "";
   const response = await request(
     options.fetch ?? fetch,
-    `/api/listings/${encodeURIComponent(id)}/nearby`,
+    `/api/listings/${encodeURIComponent(id)}/nearby${query}`,
     { method: "GET", signal: options.signal },
   );
   if (!response.ok) return response;
