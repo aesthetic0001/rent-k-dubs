@@ -99,6 +99,8 @@ export interface SearchSlice {
   toggleShortlist: (listing: Listing) => void;
   addPastedListing: (listing: Listing) => void;
   removeFromShortlist: (id: string) => void;
+  /** Puts back an entry just removed, where it was ("Undo" on the shortlist page). */
+  restoreShortlistEntry: (entry: ShortlistEntry, index: number) => void;
   /** Fills in the photo link of a listing saved before shortlists kept it (null: none). */
   setSavedImage: (id: string, imageUrl: string | null) => void;
   clearShortlist: () => void;
@@ -251,6 +253,12 @@ export const createSearchSlice: StateCreator<SearchSlice, [], [], SearchSlice> =
 
   removeFromShortlist: (id) =>
     set({ shortlist: get().shortlist.filter((entry) => entry.id !== id) }),
+
+  restoreShortlistEntry: (entry, index) => {
+    const shortlist = get().shortlist.filter((item) => item.id !== entry.id);
+    shortlist.splice(Math.min(index, shortlist.length), 0, entry);
+    set({ shortlist });
+  },
 
   setSavedImage: (id, imageUrl) =>
     set({

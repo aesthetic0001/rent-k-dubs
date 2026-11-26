@@ -42,7 +42,7 @@ export function ShareSearch() {
       <button
         type="button"
         onClick={() => void share()}
-        className="text-primary focus-visible:ring-ring/50 flex items-center gap-1 rounded-sm text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3"
+        className="decoration-foreground/30 hover:decoration-foreground focus-visible:ring-ring/50 flex items-center gap-1 rounded-sm text-sm font-medium underline underline-offset-4 transition-colors outline-none focus-visible:ring-3"
       >
         <Share2 aria-hidden className="size-3.5" />
         {t("search.share.button")}

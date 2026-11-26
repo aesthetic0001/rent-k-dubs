@@ -1,6 +1,6 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
-import { Big_Shoulders, Public_Sans } from "next/font/google";
+import { Public_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { StorePersistence } from "@/components/shortlist/store-persistence";
@@ -15,14 +15,6 @@ const publicSans = Public_Sans({
   display: "swap",
 });
 
-// Display face for the landing wordmark and headlines.
-const bigShoulders = Big_Shoulders({
-  variable: "--font-display",
-  subsets: ["latin"],
-  axes: ["opsz"],
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: { default: t("common.appName"), template: `%s · ${t("common.appName")}` },
   description: t("layout.metaDescription"),
@@ -31,13 +23,18 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // The browser bar matches the page: --background in light and dark (globals.css).
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en-CA"
-      className={`${publicSans.variable} ${bigShoulders.variable} h-full antialiased`}
+      className={`${publicSans.variable} h-full antialiased`}
       // The theme script sets the class and colour-scheme before React hydrates.
       suppressHydrationWarning
     >

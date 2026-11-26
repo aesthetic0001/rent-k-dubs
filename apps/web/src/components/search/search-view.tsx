@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ResultsMap } from "@/components/map/results-map";
+import { priceSummary } from "@/components/results/card-data";
 import { ResultCard } from "@/components/results/result-card";
 import {
   effectiveResultOrder,
@@ -16,7 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/use-media-query";
-import { FilterChips } from "./filter-chips";
+import { FilterChips, FilterSummary } from "./filter-chips";
 import { FiltersPanel } from "./filters-panel";
 import { CrimeDisclaimer } from "@/components/safety/crime-disclaimer";
 import { DestinationChoices } from "./destination-choices";
@@ -81,6 +82,8 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
   const busySince = useAppStore((s) => s.busySince);
   // "Change request" edits the words in place instead of going back to the landing page.
   const [editing, setEditing] = useState(false);
+  // The editable chips under the Filters row, opened from its one-line summary.
+  const [chipsOpen, setChipsOpen] = useState(false);
   const elapsed = useElapsedSeconds(busySince);
   // "Closest to my area" and "lowest-carbon trips" reorder the results already on screen, so they
   // never cost another search (a server-side sort is requested in PERSON_D.md for B to add).
@@ -101,6 +104,10 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
   const visibleCount = Math.min(ordered.length, pageCount);
   const selectedIndex = selectedId ? results.findIndex((r) => r.listing.id === selectedId) : -1;
   const selectedResult = selectedIndex >= 0 ? results[selectedIndex] : undefined;
+  // A verdict every visible row shares ("Underpriced" on all 25) says nothing row by row, so the
+  // list states it once above the rows instead.
+  const visible = ordered.slice(0, visibleCount);
+  const sharedVerdict = sharedPriceLabel(visible);
 
   // A pin whose card is in the list scrolls the list to it (SPEC 11.2).
   useEffect(() => {
@@ -144,7 +151,8 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
     intent?.rawPrompt === prompt ? void runSearch() : void parseAndSearch(prompt);
 
   return (
-    <div className="lg:grid lg:grid-cols-[minmax(0,36fr)_minmax(0,64fr)]">
+    // `wide-page` lets the site header run full width here, so the logo lines up with the list.
+    <div className="wide-page lg:grid lg:grid-cols-[minmax(0,36fr)_minmax(0,64fr)]">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 lg:max-w-none lg:px-6">
         <h1 className="sr-only">{t("search.title")}</h1>
 
@@ -157,11 +165,20 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
           ) : (
             <>
               <p className="mt-1">{prompt}</p>
+              {intent?.rawPrompt === prompt && intent.droppedRequests.length > 0 && (
+                // What the request asked for that the search couldn't use, so "near UW" is never
+                // silently missing from the results.
+                <p className="text-caveat-warning-foreground mt-1 text-sm">
+                  {t("search.dropped", {
+                    list: intent.droppedRequests.map((d) => `“${d.phrase}”`).join(", "),
+                  })}
+                </p>
+              )}
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                  className="decoration-foreground/30 hover:decoration-foreground text-sm font-medium underline underline-offset-4 transition-colors"
                 >
                   {t("search.editRequest")}
                 </button>
@@ -185,16 +202,23 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
           <>
             {/* A direct child of the column so it stays stuck on phones while the list scrolls
                 and Filters is always one tap away (SPEC 18). */}
-            <div className="bg-background/95 sticky top-14 z-20 -mx-4 -mb-3 flex flex-wrap items-center justify-between gap-2 px-4 py-2 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <div className="bg-background/95 sticky top-14 z-20 -mx-4 -mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 sm:flex-nowrap backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
               <FiltersPanel />
+              <FilterSummary
+                intent={intent}
+                open={chipsOpen}
+                onToggle={() => setChipsOpen((open) => !open)}
+                controls="filter-chips"
+              />
               <SortSelect />
             </div>
-            <FilterChips intent={intent} />
+            <FilterChips intent={intent} id="filter-chips" open={chipsOpen} />
             <DestinationChoices />
           </>
         )}
 
-        <div aria-live="polite" className="flex flex-col gap-4">
+        {/* Empty most of the time; -mt-6 cancels its share of the column gap until it has news. */}
+        <div aria-live="polite" className="flex flex-col gap-4 empty:-mt-6">
           {status === "idle" && intent && needsReinterpretation(intent) && (
             <p className="bg-caveat-warning text-caveat-warning-foreground rounded-lg px-3 py-2 text-sm">
               {t("search.uninterpreted")}
@@ -244,6 +268,11 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
                 eligible: formatCount(eligibleCount),
               })}
             </h2>
+            {sharedVerdict && (
+              <p className="text-muted-foreground text-xs">
+                {t(`results.sharedVerdict.${sharedVerdict}` as MessageKey)}
+              </p>
+            )}
             {intent?.safety.enabled && <CrimeDisclaimer />}
             {notices.length > 0 && (
               <ul className="text-muted-foreground text-xs">
@@ -260,9 +289,13 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
               </p>
             )}
             <ol className={`flex flex-col gap-1 ${busy ? "opacity-60" : ""}`}>
-              {ordered.slice(0, visibleCount).map((result) => (
+              {visible.map((result) => (
                 <li key={result.listing.id}>
-                  <ResultCard result={result} targets={intent?.travelTargets ?? []} />
+                  <ResultCard
+                    result={result}
+                    targets={intent?.travelTargets ?? []}
+                    hideVerdict={sharedVerdict !== null}
+                  />
                 </li>
               ))}
             </ol>
@@ -282,10 +315,10 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
 
         {/* Sticky at the bottom of the screen while the list scrolls; rests after the last card. */}
         {!desktop && results.length > 0 && (
-          <div className="sticky bottom-4 z-20 flex justify-center">
+          <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 flex justify-center">
             <Button
               onClick={() => setMobileView("map")}
-              className="h-10 rounded-full px-4 shadow-lg"
+              className="bg-foreground text-background hover:bg-foreground/90 h-10 rounded-full px-4 shadow-lg"
             >
               <MapIcon aria-hidden data-icon="inline-start" />
               {t("results.mobile.showMap")}
@@ -304,7 +337,7 @@ export function SearchView({ prompt, shared }: { prompt: string | null; shared: 
             <ResultsMap className="size-full" pinCards={false} />
             <Button
               onClick={() => setMobileView("list")}
-              className="absolute top-3 left-1/2 z-10 h-10 -translate-x-1/2 rounded-full px-4 shadow-lg"
+              className="bg-foreground text-background hover:bg-foreground/90 absolute top-3 left-1/2 z-10 h-10 -translate-x-1/2 rounded-full px-4 shadow-lg"
             >
               <List aria-hidden data-icon="inline-start" />
               {t("results.mobile.showList")}
@@ -335,7 +368,7 @@ function MapListingCard({
 }) {
   if (!result) return null;
   return (
-    <div className="animate-in slide-in-from-bottom-4 absolute inset-x-0 bottom-0 z-10 max-h-[70%] overflow-y-auto p-3 lg:right-auto lg:bottom-4 lg:left-4 lg:w-[26rem]">
+    <div className="animate-in slide-in-from-bottom-4 absolute inset-x-0 bottom-0 z-10 max-h-[70%] overflow-y-auto overscroll-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:right-auto lg:bottom-4 lg:left-4 lg:w-[26rem]">
       <div className="bg-card relative rounded-2xl border shadow-lg">
         <Button
           variant="secondary"
@@ -360,6 +393,14 @@ function ResultSkeletons() {
       ))}
     </div>
   );
+}
+
+/** The price verdict all of `results` share, or null when they differ (or there are too few). */
+function sharedPriceLabel(results: SearchResultItem[]) {
+  if (results.length < 3) return null;
+  const first = priceSummary(results[0]!.valuation).label;
+  if (first === "unknown") return null;
+  return results.every((result) => priceSummary(result.valuation).label === first) ? first : null;
 }
 
 /** Whole seconds since `since`, ticking once a second; 0 when nothing is running. */
@@ -412,6 +453,15 @@ function RequestEditor({ prompt, onDone }: { prompt: string; onDone: () => void 
         rows={3}
         className="min-h-20 resize-y text-base md:text-base"
       />
+      <p className="text-muted-foreground text-xs">
+        {t("landing.aiNotice")}{" "}
+        <Link
+          href="/privacy#request"
+          className="hover:text-foreground underline underline-offset-4"
+        >
+          {t("landing.aiNoticeLink")}
+        </Link>
+      </p>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
           {t("search.cancelEdit")}

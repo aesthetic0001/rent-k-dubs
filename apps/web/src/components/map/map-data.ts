@@ -14,11 +14,14 @@ export type ScoreBand = "high" | "mid" | "low";
 /** Score bands for pin colours; the legend shows the same thresholds as text. */
 export const SCORE_BANDS = { high: 75, mid: 50 } as const;
 
-/** Shades of the accent (never red/green); hex because MapLibre can't parse oklch(). */
+/**
+ * The top band takes the map's one accent (the coral of routes and selection); the others are
+ * neutral steps, so strong matches stand out. Hex because MapLibre can't parse oklch().
+ */
 export const BAND_COLORS: Record<ScoreBand, string> = {
-  high: "#005f99",
-  mid: "#4e8cbe",
-  low: "#9dbbd6",
+  high: "#f0866b",
+  mid: "#a9c2bd",
+  low: "#6f8c8a",
 };
 export const PLACE_COLOR = "#795bbf";
 

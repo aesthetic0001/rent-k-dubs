@@ -4,9 +4,7 @@ import { Bookmark, Building2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ListingPhoto } from "@/components/listing/listing-photo";
-import { BAND_COLORS, scoreBand } from "@/components/map/map-data";
 import { clearAmenityPin, showNearestAmenity } from "@/components/map/amenity-pin";
-import { ACTIVE_COLOR } from "@/components/map/map-pins";
 import { fetchPath } from "@/components/map/route-path";
 import { t, type MessageKey } from "@/lib/format/messages";
 import { formatCad, formatCount } from "@/lib/format/number";
@@ -19,11 +17,14 @@ const r = (key: string, params?: Record<string, string | number>) =>
   t(`results.${key}` as MessageKey, params);
 const decimal = new Intl.NumberFormat("en-CA", { maximumFractionDigits: 1 });
 
-/** The price verdict as coloured text, the way the reference row shows "Open 'til 6pm". */
+/**
+ * The price verdict in the row's text colours: a good price reads brighter, a high one in a muted
+ * amber. Coral is kept for the selection and trips, so it isn't spent on every row.
+ */
 const verdictStyles = {
-  underpriced: "text-emerald-600 dark:text-[#3ddc97]",
+  underpriced: "text-foreground",
   reasonable: "text-muted-foreground",
-  overpriced: "text-amber-600 dark:text-amber-400",
+  overpriced: "text-amber-700 dark:text-amber-300/90",
 } as const;
 
 /** Every duration is labelled as a distance-based estimate. */
@@ -83,9 +84,12 @@ function rooms(listing: SearchResultItem["listing"]): string[] {
 export function ResultCard({
   result,
   targets,
+  hideVerdict = false,
 }: {
   result: SearchResultItem;
   targets: SearchIntent["travelTargets"];
+  /** True when every row in view has the same price verdict; the list says it once instead. */
+  hideVerdict?: boolean;
 }) {
   const { listing, valuation, matchScore } = result;
   const id = listing.id;
@@ -115,9 +119,12 @@ export function ResultCard({
       onBlur={() => setHovered(null)}
       aria-current={selected ? "true" : undefined}
       className={`relative flex items-center gap-3.5 rounded-2xl border px-3.5 py-4 transition-colors ${
-        selected ? "bg-accent" : hovered ? "bg-accent/60 border-transparent" : "border-transparent"
+        selected
+          ? "bg-accent border-[#b4472f] dark:border-[#f0866b]"
+          : hovered
+            ? "bg-accent/60 border-transparent"
+            : "border-transparent"
       }`}
-      style={selected ? { borderColor: ACTIVE_COLOR } : undefined}
     >
       <div className="bg-muted text-muted-foreground grid size-14 shrink-0 place-items-center overflow-hidden rounded-full">
         <ListingPhoto
@@ -145,12 +152,12 @@ export function ResultCard({
             {listing.title}
           </Link>
         </h3>
-        <p className="figures text-muted-foreground mt-1 truncate text-xs">
+        <p className="figures text-muted-foreground mt-1 text-xs sm:truncate">
           <span className="text-foreground font-medium">{rent}</span>
           {rooms(listing).map((part) => (
             <span key={part}> • {part}</span>
           ))}
-          {price.label !== "unknown" && (
+          {price.label !== "unknown" && !hideVerdict && (
             <span className={`font-medium ${verdictStyles[price.label]}`}>
               {" "}
               • {r(`price.${price.label}`)}
@@ -196,15 +203,14 @@ export function ResultCard({
         >
           <Bookmark
             aria-hidden
-            className={`size-4 ${shortlisted ? "fill-primary text-primary" : "text-muted-foreground"}`}
+            className={`size-4 ${shortlisted ? "fill-foreground text-foreground" : "text-muted-foreground"}`}
           />
         </button>
         <span
           role="img"
           aria-label={t("results.map.cardScore", { score })}
           title={t("results.map.cardScore", { score })}
-          className="figures grid size-7 place-items-center rounded-full border-2 text-[0.625rem] font-semibold"
-          style={{ borderColor: BAND_COLORS[scoreBand(matchScore.total)] }}
+          className="figures text-muted-foreground border-border grid size-8 place-items-center rounded-full border text-[0.6875rem] font-medium"
         >
           {score}
         </span>

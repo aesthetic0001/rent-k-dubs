@@ -31,6 +31,7 @@ import { NearbySection, NearbyTile } from "./nearby-section";
 import { useListingDetail } from "./use-listing-detail";
 import { useNearby, type NearbyState } from "./use-nearby";
 import { addressLine } from "@/components/listing/address-line";
+import { contactHref } from "@/lib/site";
 
 const l = (key: string, params?: Record<string, string | number>) =>
   t(`listing.${key}` as MessageKey, params);
@@ -218,7 +219,7 @@ function PhotoHero({
           className="text-hero-foreground/90 hover:text-hero-foreground mx-auto mt-4 flex w-fit flex-col items-center gap-1 text-sm font-medium"
         >
           {l("toDetails")}
-          <ChevronDown aria-hidden className="size-5 motion-safe:animate-bounce" />
+          <ChevronDown aria-hidden className="size-5" />
         </a>
       </div>
     </div>
@@ -363,8 +364,36 @@ function Header({
           </button>
         </div>
         <p className="text-hero-muted text-xs">{l("sourceNote", { source })}</p>
+        <ReportLink listing={listing} />
       </div>
     </header>
+  );
+}
+
+/**
+ * "Report this listing": an email to us with the listing's address filled in (scams, discriminatory
+ * ads, a renter's own photos), or the Terms' contact section while no address is set.
+ */
+function ReportLink({ listing }: { listing: SearchResultItem["listing"] }) {
+  return (
+    <a
+      href={contactHref() ?? "/terms#contact"}
+      // With an address set, the email names the listing; the page address is only known here.
+      onClick={(event) => {
+        const mail = contactHref(
+          l("reportSubject", { id: listing.id }),
+          l("reportBody", {
+            url: `${window.location.origin}/listing/${listing.id} (${listing.sourceUrl})`,
+          }),
+        );
+        if (!mail) return;
+        event.preventDefault();
+        window.location.href = mail;
+      }}
+      className="text-hero-muted hover:text-hero-foreground text-xs underline underline-offset-4 transition-colors"
+    >
+      {l("report")}
+    </a>
   );
 }
 

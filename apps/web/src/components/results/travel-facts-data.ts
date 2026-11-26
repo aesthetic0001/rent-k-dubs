@@ -28,18 +28,32 @@ export function carbonSummary(carbon: CommuteCarbon): CarbonSummary {
   return { kind: "transitUnknown", driveGrams: carbon.driveGramsPerTrip };
 }
 
+/** "400 g", "2.4 kg": whole numbers, or one decimal under ten. */
+const unit = (name: string, decimals: number) =>
+  new Intl.NumberFormat("en-CA", {
+    style: "unit",
+    unit: name,
+    unitDisplay: "short",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+const grams = unit("gram", 0);
+const kilograms = [unit("kilogram", 1), unit("kilogram", 0)] as const;
+const metresFormat = unit("meter", 0);
+const kilometres = [unit("kilometer", 1), unit("kilometer", 0)] as const;
+
 /** Grams below a kilogram read as grams, because "0.4 kg" hides how small the number is. */
-export function formatCo2e(grams: number): string {
-  if (grams < 1_000) return `${Math.round(grams)} g`;
-  const kg = grams / 1_000;
-  return `${kg >= 10 ? Math.round(kg) : kg.toFixed(1)} kg`;
+export function formatCo2e(g: number): string {
+  if (g < 1_000) return grams.format(Math.round(g));
+  const kg = g / 1_000;
+  return kilograms[kg >= 10 ? 1 : 0].format(kg >= 10 ? Math.round(kg) : kg);
 }
 
 /** Metres below a kilometre read as metres, so a 400 m walk to the shops is not "0.4 km". */
 export function formatDistance(metres: number): string {
-  if (metres < 1_000) return `${Math.round(metres / 10) * 10} m`;
+  if (metres < 1_000) return metresFormat.format(Math.round(metres / 10) * 10);
   const km = metres / 1_000;
-  return `${km >= 10 ? Math.round(km) : km.toFixed(1)} km`;
+  return kilometres[km >= 10 ? 1 : 0].format(km >= 10 ? Math.round(km) : km);
 }
 
 /**

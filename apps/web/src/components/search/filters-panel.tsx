@@ -118,7 +118,7 @@ export function FiltersPanel() {
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+        className="accent-trip gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-md"
       >
         <SheetHeader className="border-b pr-12">
           <SheetTitle className="text-lg font-semibold">{p("title")}</SheetTitle>
@@ -128,10 +128,11 @@ export function FiltersPanel() {
         {draft && (
           <div className="flex-1 overflow-y-auto px-4 py-5">
             <HideUnconfirmed checked={draftHide} onChange={setDraftHide} />
-            <PrioritiesSection draft={draft} edit={edit} />
+            {/* What the renter asked for first; how the match score weighs it after. */}
             <PriceSection draft={draft} edit={edit} />
             <HomeSection draft={draft} edit={edit} />
             <TravelSection draft={draft} edit={edit} destinations={destinations} />
+            <PrioritiesSection draft={draft} edit={edit} />
             <SafetySection draft={draft} edit={edit} />
             <AreaSection draft={draft} edit={edit} />
           </div>
@@ -595,6 +596,8 @@ function AddPlace({ edit }: { edit: Edit }) {
       <div className="flex gap-2">
         <Input
           id={id}
+          name="place"
+          autoComplete="off"
           value={query}
           maxLength={500}
           placeholder={p("placePlaceholder")}
@@ -636,7 +639,7 @@ function AddAmenity({ edit }: { edit: Edit }) {
           id={id}
           value={category}
           onChange={(event) => setCategory(event.target.value as AmenityCategory | "")}
-          className="border-input bg-card focus-visible:ring-ring/50 h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+          className="border-input bg-card text-foreground focus-visible:ring-ring/50 h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
         >
           <option value="">{p("amenityLabel")}</option>
           {AMENITY_CATEGORIES.map((value) => (

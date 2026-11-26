@@ -19,7 +19,10 @@
       "label": "Footer",
       "askingRents": "Asking rents from public listings, not official statistics.",
       "data": "Sources and methods",
-      "status": "Status"
+      "status": "Status",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "contact": "Contact"
     },
     "metaDescription": "Describe the rental you need. Rent the Loo searches Waterloo listings, checks each price against similar homes, and shows the neighbourhood around it.",
     "theme": {
@@ -28,15 +31,20 @@
     }
   },
   "landing": {
-    "tagline": "Waterloo home finding, made easy",
-    "logoTop": "Rent the",
-    "logoBottom": "Loo",
-    "scrollCue": "Scroll",
     "jump": "Skip to search",
+    "hero": {
+      "lede": "Say what you need in your own words. We search the rental sites for you and check every price against similar homes nearby.",
+      "cta": "Start your search",
+      "stats": {
+        "listings": "Listings checked",
+        "neighbourhoods": "Neighbourhoods mapped",
+        "sources": "Rental sites searched"
+      }
+    },
     "say": {
       "title": "Say it how you would say it.",
       "prompt": "2-bed near UW under $2,200, cat-friendly, with AC",
-      "caption": "Every phrase becomes a filter you can change. Solid ones are must-haves; outlined ones only move a listing up or down.",
+      "caption": "Every phrase becomes a filter you can change. Solid ones must match; outlined ones are nice to have.",
       "chips": {
         "beds": {
           "phrase": "2-bed",
@@ -44,7 +52,7 @@
         },
         "near": {
           "phrase": "near UW",
-          "label": "Near UW by transit"
+          "label": "Near UW"
         },
         "rent": {
           "phrase": "under $2,200",
@@ -66,17 +74,17 @@
     "title": "Find a Waterloo rental that fits, at a fair price",
     "subtitle": "Describe what you need in your own words. We search listings from several sites, check each price against similar homes nearby, and show you the neighbourhood around it.",
     "promptLabel": "Describe the place you're looking for",
-    "promptPlaceholder": "e.g. 2-bedroom near UW under $2,200, 15 minutes by transit, cat-friendly, with AC",
+    "promptPlaceholder": "e.g. 2-bedroom near UW under $2,200, 15 minutes by transit, cat-friendly, with AC…",
     "submit": "Search",
     "examplesLabel": "Or try an example",
     "examples": {
       "student": {
         "label": "Student",
-        "prompt": "Room or studio near UW under $1,000, within 15 minutes walking, furnished."
+        "prompt": "Room or studio near Laurier under $1,000, within 15 minutes walking, furnished."
       },
       "couple": {
         "label": "Couple",
-        "prompt": "I need a 2-bedroom near Uptown Waterloo under $2,300, within 20 minutes by transit, close to groceries, cat-friendly, and I really care about getting a good deal. I make about $95k with my roommate."
+        "prompt": "2-bedroom near Uptown Waterloo under $2,300, within 20 minutes by transit, close to groceries, cat-friendly. A good deal matters most."
       },
       "family": {
         "label": "Family",
@@ -86,6 +94,22 @@
     "paste": {
       "title": "Paste a listing",
       "body": "Found a place on Facebook or anywhere else? Paste it to check the price and the area."
+    },
+    "aiNotice": "Google Gemini reads your request to turn it into filters. Leave out names, phone numbers and other personal details.",
+    "aiNoticeLink": "How we handle it",
+    "result": {
+      "title": "What comes back",
+      "label": "An example result for that request",
+      "name": "2-bed apartment on Lester Street",
+      "area": "Northdale, Waterloo",
+      "rent": "$1,950",
+      "perMonth": "/month",
+      "price": "$180 below similar 2-beds nearby",
+      "low": "$1,950",
+      "typical": "Typical $2,130",
+      "trip": "14 min to UW by bus",
+      "facts": "Cats allowed · Air conditioning",
+      "map": "Route from the apartment to UW"
     }
   },
   "search": {
@@ -96,6 +120,7 @@
     "startSearch": "Start a search",
     "editRequest": "Change request",
     "reinterpret": "Try interpreting again",
+    "dropped": "Not used in this search: {list}",
     "uninterpreted": "We couldn't interpret your request, so no search was run. Try interpreting it again or change your request.",
     "parsing": "Reading your request…",
     "searching": "Finding listings…",
@@ -282,7 +307,7 @@
       "open": "Filters",
       "openWithCount": "Filters ({count})",
       "title": "Filters",
-      "description": "Changes apply when you press Show results. Editing filters never calls AI.",
+      "description": "Changes apply when you press Show results.",
       "apply": "Show results",
       "cancel": "Cancel",
       "invalid": "Some values don't fit together, for example a minimum above the maximum. Fix them to continue.",
@@ -333,7 +358,7 @@
       "removeTarget": "Remove {label}",
       "addPlace": "Add a place",
       "placeLabel": "Place or address",
-      "placePlaceholder": "e.g. University of Waterloo, Uptown Waterloo",
+      "placePlaceholder": "e.g. University of Waterloo, Uptown Waterloo…",
       "find": "Find",
       "finding": "Finding…",
       "whichOne": "Which one do you mean?",
@@ -380,17 +405,17 @@
     "summaryMore": "and {count} more",
     "legendMust": "Must-have",
     "legendPreference": "Preference",
-    "legendDefault": "Assumed for you",
+    "legendDefault": "Default, not from your request",
     "legendTap": "Tap a chip to change it.",
     "sortOptions": {
-      "best_match": "Best Match",
-      "lowest_rent": "Lowest Rent",
-      "best_value": "Best Value",
-      "shortest_trips": "Shortest Estimated Travel Time",
-      "lowest_true_cost": "Lowest True Monthly Cost",
+      "best_match": "Best match",
+      "lowest_rent": "Lowest rent",
+      "best_value": "Best value",
+      "shortest_trips": "Shortest estimated travel time",
+      "lowest_true_cost": "Lowest true monthly cost",
       "newest": "Newest",
-      "closest_area": "Closest to My Area",
-      "lowest_carbon": "Lowest-Carbon Trips"
+      "closest_area": "Closest to my area",
+      "lowest_carbon": "Lowest-carbon trips"
     }
   },
   "results": {
@@ -425,6 +450,11 @@
       "safety": "Reported crime levels"
     },
     "approx": "Approximate location",
+    "sharedVerdict": {
+      "underpriced": "Every listing shown is priced below similar listings nearby.",
+      "reasonable": "Every listing shown is priced in line with similar listings nearby.",
+      "overpriced": "Every listing shown is priced above similar listings nearby."
+    },
     "price": {
       "underpriced": "Underpriced",
       "reasonable": "Reasonably priced",
@@ -531,7 +561,7 @@
         "places": "Nearest places in this category",
         "count": "{n} / {total}",
         "search": "Search for a place",
-        "searchPlaceholder": "Search for a place, like Walmart",
+        "searchPlaceholder": "Search for a place, like Walmart…",
         "searchClose": "Close search",
         "searching": "Searching…",
         "searchNone": "No places called “{q}” around Waterloo.",
@@ -547,7 +577,7 @@
       "open": "How this works",
       "title": "How reported crime levels work",
       "what": "Reported crime levels are optional and off unless you turn them on. They use police-reported neighbourhood crime rates.",
-      "measure": "We add up five major crime types (assault, break and enter, auto theft, robbery, theft over $5,000) per 100,000 residents, averaged over the last three published years, and compare the neighbourhood with the city. \"0.7× the city rate\" means 30% below it.",
+      "measure": "We add up five major crime types (assault, break and enter, auto theft, robbery, theft over $5,000) per 100,000 residents, averaged over the last three published years, and compare the neighbourhood with the city. “0.7× the city rate” means 30% below it.",
       "ranking": "When they're on, reported crime levels are {weight}% of the match score: {full}× the city rate or lower scores 100, {zero}× or higher scores 0, in a straight line between.",
       "mustHave": "With a limit set, it keeps only neighbourhoods at or below that many times the city rate (the city rate unless you move the slider).",
       "never": "Every listing in a neighbourhood gets the same figure. Nothing is worked out for a street or a building, and the figure is never a label for a place or the people in it.",
@@ -813,7 +843,10 @@
       },
       "more": "Show more nearby",
       "tileNote": "Straight-line distance from the listing."
-    }
+    },
+    "report": "Report this listing",
+    "reportSubject": "Report listing {id}",
+    "reportBody": "Listing: {url}\n\nWhat's wrong (scam, discriminatory, rented, wrong details, my photo, other):\n"
   },
   "shortlist": {
     "title": "Your shortlist",
@@ -823,6 +856,8 @@
     "startSearch": "Start a search",
     "savedOn": "Saved {date}",
     "pasted": "Pasted listing",
+    "removed": "Removed {title}",
+    "undo": "Undo",
     "asSaved": "Rents and details are shown as they were when you saved each listing. Open one to see its latest.",
     "clear": {
       "button": "Clear my data",
@@ -1050,6 +1085,134 @@
       "listings": "Listings",
       "seen": "Seen",
       "note": "Asking rents, not signed leases. A listing seen at more than one price counts each price."
+    }
+  },
+  "legal": {
+    "updated": "Last updated {date}",
+    "contents": "On this page",
+    "emailUs": "Email {email}",
+    "contactMissing": "A contact address will be listed here before launch.",
+    "privacy": {
+      "title": "Privacy",
+      "intro": "Rent the Loo has no accounts and never asks for your name, email or phone number. This page explains what does leave your browser when you use the site, and who receives it.",
+      "sections": {
+        "request": {
+          "heading": "Your search request",
+          "body": {
+            "1": "When you search, the words you type go to our server and to Google Gemini, Google’s AI service, which turns them into filters like rent, bedrooms and places. If Gemini is unavailable, a simpler reader on our own server does it instead.",
+            "2": "We keep Gemini’s reading of a request for up to 5 minutes so repeating the same search is fast, then it is deleted. We don’t keep a history of searches.",
+            "3": "Your request is part of the page address (/search?q=…), so it appears in your browser history and in our hosting provider’s request logs. Leave out names, phone numbers and other personal details."
+          }
+        },
+        "browser": {
+          "heading": "What stays in your browser",
+          "body": {
+            "1": "Your shortlist, your last search and your light or dark theme are kept in your browser’s storage on this device. They are not sent to us and are not shared between devices.",
+            "2": "Clear them with “Clear my data” on the Shortlist page, or by clearing this site’s data in your browser settings."
+          }
+        },
+        "cookies": {
+          "heading": "Cookies",
+          "body": {
+            "1": "We don’t set cookies, and our analytics don’t use them."
+          }
+        },
+        "analytics": {
+          "heading": "Analytics",
+          "body": {
+            "1": "We use Vercel Web Analytics to count visits. It records the page address, the page you came from, your browser and device type, and your country. It uses no cookies and can’t follow you to other sites. Because the page address includes your search request, analytics can include it too."
+          }
+        },
+        "services": {
+          "heading": "Other services your browser talks to",
+          "body": {
+            "1": "Some parts of a page load straight from other companies, which see your IP address and what they send:",
+            "2": "Map tiles come from OpenFreeMap (or MapTiler). They see the area of the map you are looking at.",
+            "3": "Place search on the map (“Walmart”) goes to Photon by komoot, with the words you type and the listing’s location.",
+            "4": "Listing photos load from the site that posted the ad, such as Kijiji or Facebook Marketplace.",
+            "5": "The site is hosted by Vercel. Travel times are worked out on our own server."
+          }
+        },
+        "listings": {
+          "heading": "People named in listings",
+          "body": {
+            "1": "Listings come from public ads. We remove email addresses, phone numbers, links and names from the ad text we keep, but a title or photo can still identify someone. We show what you need to judge the listing and link back to the original ad. If a listing about you, your home or your photos should come down, contact us and we will remove it."
+          }
+        },
+        "location": {
+          "heading": "Where it is processed",
+          "body": {
+            "1": "Google and Vercel may process data outside Canada, including in the United States, under their own privacy policies."
+          }
+        },
+        "contact": {
+          "heading": "Questions and requests",
+          "body": {
+            "1": "Ask us what we hold about you, or ask us to correct or delete it, using the contact below. If you are not satisfied with our answer, you can complain to the Office of the Privacy Commissioner of Canada (priv.gc.ca)."
+          }
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of use",
+      "intro": "By using Rent the Loo you agree to these terms. They are short because the site is free and doesn’t sell anything.",
+      "sections": {
+        "what": {
+          "heading": "What Rent the Loo is",
+          "body": {
+            "1": "A search tool for rental listings in Waterloo, gathered from public listing sites. We are not a landlord, agent or broker. We don’t arrange rentals, collect rent or take any payments."
+          }
+        },
+        "listings": {
+          "heading": "Listings",
+          "body": {
+            "1": "Listings are written by other people on other sites. We don’t check them, and one may be wrong, already rented or gone. Always read the original ad and confirm the details with the landlord.",
+            "2": "Never send money before you have seen the place and signed a lease. If a listing looks like a scam, report it to us and to the site that posted it."
+          }
+        },
+        "estimates": {
+          "heading": "Our estimates",
+          "body": {
+            "1": "Match scores, price labels like “Underpriced”, travel times and neighbourhood figures are estimates made by our code from public data. They are not appraisals or advice. How each one works is on the Sources and methods page."
+          }
+        },
+        "content": {
+          "heading": "Photos and ad text",
+          "body": {
+            "1": "Photos and ad text belong to their owners. We link to photos where the original site hosts them and don’t copy them to our servers. If you own something shown here and want it removed, contact us."
+          }
+        },
+        "fairness": {
+          "heading": "Discrimination in listings",
+          "body": {
+            "1": "Under the Ontario Human Rights Code, landlords can’t refuse renters because of race, sex, family status, disability, receipt of public assistance and other protected grounds. We republish ads as they were written, which doesn’t mean we agree with them. Report a discriminatory listing and we will take it down."
+          }
+        },
+        "use": {
+          "heading": "Using the site",
+          "body": {
+            "1": "Use Rent the Loo for your own housing search. Don’t try to break it, overload it or use it to harass anyone."
+          }
+        },
+        "liability": {
+          "heading": "No guarantees",
+          "body": {
+            "1": "The site is provided as is. As far as the law allows, we are not responsible for decisions you make or losses you have from using it, including from a listing that turns out to be wrong."
+          }
+        },
+        "changes": {
+          "heading": "Changes and law",
+          "body": {
+            "1": "We may update these terms; the date at the top shows the latest version. These terms are governed by the laws of Ontario and Canada."
+          }
+        },
+        "contact": {
+          "heading": "Contact",
+          "body": {
+            "1": "Report a listing with the “Report this listing” link on its page, or reach us at the address below."
+          }
+        }
+      }
     }
   }
 }

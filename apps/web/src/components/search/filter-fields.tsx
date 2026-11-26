@@ -78,6 +78,8 @@ export function RangeInputs({
         inputMode="decimal"
         min={0}
         step={step}
+        name={`${field}-min`}
+        autoComplete="off"
         placeholder={t("filters.panel.min")}
         aria-label={t("filters.panel.minOf", { field })}
         value={minText}
@@ -92,6 +94,8 @@ export function RangeInputs({
         inputMode="decimal"
         min={0}
         step={step}
+        name={`${field}-max`}
+        autoComplete="off"
         placeholder={t("filters.panel.max")}
         aria-label={t("filters.panel.maxOf", { field })}
         value={maxText}
@@ -154,7 +158,7 @@ export function SelectInput<V extends string>({
       aria-label={label}
       value={value}
       onChange={(event) => onChange(event.target.value as V | "")}
-      className="border-input bg-card focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+      className="border-input bg-card text-foreground focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
     >
       <option value="">{t("filters.panel.any")}</option>
       {options.map((option) => (

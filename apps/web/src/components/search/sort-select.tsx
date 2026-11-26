@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ArrowUpDown, ChevronDown } from "lucide-react";
 import { useId } from "react";
 import {
   carbonComparable,
@@ -47,8 +47,10 @@ export function SortSelect() {
   const value: Choice = effective === "server" ? intent.sortBy : effective;
 
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-muted-foreground text-sm">
+    <div className="flex shrink-0 items-center gap-2">
+      {/* Named for screen readers; the icon and the option text say "sort" on screen, so the
+          filter summary beside it has room to finish its sentence. */}
+      <label htmlFor={id} className="sr-only">
         {t("filters.panel.sortBy")}
       </label>
       {/* Our own chevron: the browser's arrow sits flush against the rounded edge. */}
@@ -71,7 +73,7 @@ export function SortSelect() {
             }));
             void runSearch();
           }}
-          className="border-input bg-card focus-visible:ring-ring/50 h-9 cursor-pointer appearance-none rounded-full border pr-9 pl-3.5 text-sm font-medium outline-none focus-visible:ring-3"
+          className="border-input bg-card text-foreground focus-visible:ring-ring/50 h-9 cursor-pointer appearance-none rounded-full border pr-9 pl-9 text-sm font-medium outline-none focus-visible:ring-3"
         >
           {sorts.map((sort) => (
             <option key={sort} value={sort}>
@@ -84,6 +86,10 @@ export function SortSelect() {
             </option>
           ))}
         </select>
+        <ArrowUpDown
+          aria-hidden
+          className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2"
+        />
         <ChevronDown
           aria-hidden
           className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2"
